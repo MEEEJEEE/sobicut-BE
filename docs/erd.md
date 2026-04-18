@@ -23,8 +23,10 @@ User → Transaction → Emotion → Analysis
 - id (PK)
 - user_id (FK)
 - amount
+- type (income / expense)
 - category
 - merchant
+- description
 - transaction_date
 - transaction_time
 - created_at
@@ -50,6 +52,15 @@ User → Transaction → Emotion → Analysis
 - day_type
 - score
 
+### Notification
+- id (PK)
+- user_id (FK)
+- title
+- message
+- type
+- is_read
+- created_at
+
 ---
 
 ## 3. Relationships
@@ -58,19 +69,20 @@ User → Transaction → Emotion → Analysis
 - Transaction N : M EmotionTag
 - Transaction 1 : N Satisfaction
 - User 1 : 1 Budget
+- User 1 : N Notification
 
 ---
 
-## 4. ERD Diagram
+## 4. ERD Diagram (Mermaid)
 
 ```mermaid
 erDiagram
     USERS ||--o{ TRANSACTIONS : has
     USERS ||--|| BUDGETS : owns
+    USERS ||--o{ NOTIFICATIONS : receives
 
     TRANSACTIONS ||--o{ TRANSACTION_EMOTIONS : mapped
     EMOTION_TAGS ||--o{ TRANSACTION_EMOTIONS : mapped
-
     TRANSACTIONS ||--o{ SATISFACTIONS : has
 
     USERS {
@@ -87,8 +99,10 @@ erDiagram
         int id
         int user_id
         int amount
+        string type
         string category
         string merchant
+        string description
         date transaction_date
         time transaction_time
         datetime created_at
@@ -117,4 +131,14 @@ erDiagram
         int transaction_id
         string day_type
         int score
+    }
+
+    NOTIFICATIONS {
+        int id
+        int user_id
+        string title
+        string message
+        string type
+        boolean is_read
+        datetime created_at
     }
