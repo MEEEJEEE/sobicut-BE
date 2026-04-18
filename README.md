@@ -215,3 +215,10 @@ MBTI처럼 소비 유형 제공
 
 ## 📅 개발 계획
 
+---
+
+## 📄 Documents
+
+- [ERD](docs/erd.md)
+- [API](docs/api.md)
+
