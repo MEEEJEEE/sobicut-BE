@@ -1,0 +1,23 @@
+{
+  "_comment": "임시 가중치 — PCA 또는 설문 기반 산출값으로 교체 예정 (담당: AI 파트)",
+  "bias": -2.0,
+  "behavior": {
+    "time_abnormal": 0.8,
+    "amount_burden": 1.5,
+    "repeat_consumption": 1.0,
+    "peer_comparison": 1.1,
+    "regret_score": 1.4
+  },
+  "emotion": {
+    "스트레스": 2.0,
+    "무의식": 1.8,
+    "귀찮음": 0.7,
+    "성취": -0.4,
+    "행복": -0.6,
+    "고마움": -1.0
+  },
+  "regret_day_weights": {
+    "7일": 0.4,
+    "30일": 0.6
+  }
+}
