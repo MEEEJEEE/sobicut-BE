@@ -19,3 +19,6 @@ venv/
 .idea/
 .vscode/
 .DS_Store
+
+# Alembic cache
+alembic/versions/__pycache__/
