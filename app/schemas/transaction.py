@@ -40,4 +40,4 @@ class TransactionOut(BaseModel):
 
 
 class TransactionDetailOut(TransactionOut):
-    impulse_score: int
+    impulse_score: int = 0
