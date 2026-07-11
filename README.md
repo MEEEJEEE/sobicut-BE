@@ -214,6 +214,63 @@ MBTI처럼 소비 유형 제공
 ---
 
 
+---
+
+## 🚀 실행 방법
+
+### 1. 환경 설정
+
+```bash
+python3.11 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+cp .env.example .env   # DATABASE_URL, SECRET_KEY 수정
+```
+
+### 2. DB 마이그레이션
+
+```bash
+alembic upgrade head
+```
+
+### 3. 서버 실행
+
+```bash
+uvicorn app.main:app --reload
+```
+
+- Swagger UI: http://localhost:8000/docs (API 명세의 source of truth)
+
+### 4. 테스트
+
+```bash
+pytest
+```
+
+---
+
+## 📁 프로젝트 구조
+
+```
+app/
+├── main.py          # FastAPI 앱 진입점
+├── core/            # 설정, JWT 보안, 의존성
+├── db/              # 세션, Base, 시드 데이터(감정 태그 6종)
+├── models/          # SQLAlchemy 모델 (ERD v2)
+├── schemas/         # Pydantic 요청/응답 스키마
+├── services/        # 충동 점수·지갑 온도·BPTI·리포트·레벨 로직
+│   └── weights.json # 충동 점수 가중치 (PCA/설문 산출값으로 교체 예정)
+└── routers/         # API 라우터 (auth/users/transactions/emotions/budget/satisfactions/notifications/reports)
+alembic/             # DB 마이그레이션
+tests/               # pytest 테스트 (28건)
+```
+
+> 충동 점수 가중치는 `app/services/weights.json`에 분리되어 있어,
+> AI 파트의 PCA/설문 기반 산출값으로 코드 수정 없이 교체할 수 있습니다.
+
+---
+
 ## 📄 Documents
 
 - [ERD](docs/erd.md)
