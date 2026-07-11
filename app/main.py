@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from app.db.base import Base
 from app.db.seed import seed_emotion_tags
 from app.db.session import SessionLocal, engine
-from app.routers import auth, budget, emotions, notifications, satisfactions, transactions, users
+from app.routers import auth, budget, reports, emotions, notifications, satisfactions, transactions, users
 
 
 @asynccontextmanager
@@ -34,6 +34,7 @@ app.include_router(emotions.router)
 app.include_router(budget.router)
 app.include_router(satisfactions.router)
 app.include_router(notifications.router)
+app.include_router(reports.router)
 
 
 @app.get("/", tags=["Health"])
