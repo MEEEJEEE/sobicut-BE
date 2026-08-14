@@ -156,6 +156,7 @@ Query Parameters:
 - `year` (int, optional)
 - `month` (int, optional)
 - `week` (int, optional): ISO week number
+- `date` (string, optional): `YYYY-MM-DD` 단건 조회 (다른 필터와 함께 사용 가능)
 - `type` (string, optional): `income` | `expense`
 - `category` (string, optional)
 
@@ -595,8 +596,7 @@ Response:
   "peer_group": {
     "residence_type": "자취",
     "income_level": "30-60",
-    "avg_spent": 650000,
-    "avg_budget": 1000000
+    "avg_usage_rate": 65.0
   },
   "temperature_levels": [
     { "min": 0,   "max": 19,  "emoji": "❄️", "label": "매우 안정", "status": "매우 안정", "message": "지갑이 시원하게 유지되고 있어요. 아직 충분히 여유 있어요" },
@@ -727,6 +727,23 @@ Response:
 ```
 
 > `time_slot` 기준: 아침(06~11시), 점심(11~14시), 저녁(14~19시), 밤(19~23시), 새벽(23~06시)
+
+---
+
+### GET /reports/daily
+일자별 수입/지출 합계 조회
+
+Query Parameters:
+- `year` (int)
+- `month` (int)
+
+Response:
+```json
+[
+  { "date": "2026-07-01", "income": 0, "expense": 12000 },
+  { "date": "2026-07-03", "income": 500000, "expense": 34000 }
+]
+```
 
 ---
 
