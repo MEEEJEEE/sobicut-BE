@@ -70,10 +70,16 @@ def _setup_spending(client, auth_headers):
 def test_reports(client, auth_headers):
     _setup_spending(client, auth_headers)
 
+    # /reports/scores는 year/month를 받지 않고 시스템 현재 날짜 기준으로 집계되므로,
+    # 시스템 날짜와 무관하게 통과하도록 year=2026&month=7을 명시하는 개별 엔드포인트로 검증한다.
     scores = client.get("/reports/scores", headers=auth_headers).json()
     assert 0 <= scores["impulse_score"] <= 100
-    assert scores["wallet_temperature"]["my_temp"] == 30  # 150000/500000
-    assert scores["bpti"]["type"] == "FIRE"  # 주력 태그: 스트레스
+
+    wallet_temp = client.get("/reports/wallet-temperature?year=2026&month=7", headers=auth_headers).json()
+    assert wallet_temp["my_temp"] == 30  # 150000/500000
+
+    bpti = client.get("/reports/bpti?year=2026&month=7", headers=auth_headers).json()
+    assert bpti["type"] == "FIRE"  # 주력 태그: 스트레스
 
     impulse = client.get("/reports/impulse?year=2026&month=7", headers=auth_headers).json()
     assert impulse["threshold"] == 75
