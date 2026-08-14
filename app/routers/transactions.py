@@ -1,3 +1,5 @@
+from datetime import date as date_type
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session, joinedload
@@ -64,6 +66,7 @@ def list_transactions(
     year: int | None = Query(None),
     month: int | None = Query(None),
     week: int | None = Query(None, description="ISO 주차"),
+    date: date_type | None = Query(None, description="YYYY-MM-DD 단건 조회"),
     type: str | None = Query(None),
     category: str | None = Query(None),
     user: User = Depends(get_current_user),
@@ -78,6 +81,8 @@ def list_transactions(
         q = q.filter(extract("year", Transaction.transaction_date) == year)
     if month:
         q = q.filter(extract("month", Transaction.transaction_date) == month)
+    if date:
+        q = q.filter(Transaction.transaction_date == date)
     if type:
         q = q.filter(Transaction.type == type)
     if category:
