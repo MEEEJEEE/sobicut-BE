@@ -150,6 +150,28 @@ def monthly_forecast(db: Session, user_id: int, year: int, month: int) -> dict:
     }
 
 
+def daily_report(db: Session, user_id: int, year: int, month: int) -> list[dict]:
+    """일자별 수입/지출 합계 (해당 월 기준)"""
+    txs = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == user_id,
+            extract("year", Transaction.transaction_date) == year,
+            extract("month", Transaction.transaction_date) == month,
+        )
+        .all()
+    )
+    sums: dict = {}
+    for t in txs:
+        day = sums.setdefault(t.transaction_date, {"income": 0, "expense": 0})
+        day[t.type] += t.amount
+
+    return [
+        {"date": d.isoformat(), "income": v["income"], "expense": v["expense"]}
+        for d, v in sorted(sums.items())
+    ]
+
+
 def weekly_temperatures(db: Session, user_id: int, year: int, month: int) -> list[dict]:
     """주차별 온도 (주차 예산 대비 주차 지출)"""
     status = budget_status(db, user_id, year, month)

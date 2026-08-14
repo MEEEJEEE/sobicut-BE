@@ -217,6 +217,17 @@ def get_heatmap(
     return report_service.heatmap_report(db, user.id, year, month)
 
 
+@router.get("/daily")
+def get_daily_report(
+    year: int | None = Query(None),
+    month: int | None = Query(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    year, month = _now_ym(year, month)
+    return report_service.daily_report(db, user.id, year, month)
+
+
 @router.get("/monthly-forecast")
 def get_monthly_forecast(
     year: int | None = Query(None),
