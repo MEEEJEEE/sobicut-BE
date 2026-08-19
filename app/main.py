@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.seed import seed_emotion_tags
 from app.db.session import SessionLocal, engine
@@ -25,6 +27,14 @@ app = FastAPI(
     description="감정 기반 소비 분석으로 충동 소비를 줄이는 대학생 맞춤형 스마트 가계부",
     version="2.0.0",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth.router)
