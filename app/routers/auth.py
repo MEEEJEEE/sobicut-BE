@@ -40,7 +40,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=422, detail="소득구간 값이 올바르지 않습니다.")
     if not is_valid_password(body.password):
         raise HTTPException(status_code=422, detail=PASSWORD_RULE_MESSAGE)
-    if db.query(User).filter(User.email == body.email).first():
+    if db.query(User).filter(User.email == body.email, User.deleted_at.is_(None)).first():
         raise HTTPException(status_code=409, detail="이미 사용 중인 이메일입니다.")
 
     user = User(
@@ -94,7 +94,9 @@ def withdraw(
 
 @router.post("/check-email", response_model=CheckEmailResponse)
 def check_email(body: CheckEmailRequest, db: Session = Depends(get_db)):
-    exists = db.query(User).filter(User.email == body.email).first() is not None
+    exists = (
+        db.query(User).filter(User.email == body.email, User.deleted_at.is_(None)).first() is not None
+    )
     return CheckEmailResponse(is_available=not exists)
 
 
