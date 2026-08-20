@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -10,9 +10,19 @@ class User(Base):
     """사용자 (거주형태/소득구간은 또래 그룹핑에 사용)"""
 
     __tablename__ = "users"
+    __table_args__ = (
+        # 탈퇴(soft delete) 계정은 이메일 유니크 제약에서 제외 → 탈퇴 이메일로 재가입 가능
+        Index(
+            "ix_users_email_active",
+            "email",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
     password: Mapped[str] = mapped_column(String(255), nullable=False)  # bcrypt 해시
     nickname: Mapped[str] = mapped_column(String(50), nullable=False)
     residence_type: Mapped[str] = mapped_column(String(20), nullable=False)  # 자취 | 기숙사 | 통학
