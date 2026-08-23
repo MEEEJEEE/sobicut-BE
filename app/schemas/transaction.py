@@ -41,3 +41,15 @@ class TransactionOut(BaseModel):
 
 class TransactionDetailOut(TransactionOut):
     impulse_score: int = 0
+
+
+class CardMessageParseRequest(BaseModel):
+    message_text: str = Field(min_length=1)
+
+
+class CardMessageParseResponse(BaseModel):
+    amount: int
+    merchant: str
+    transaction_date: date
+    transaction_time: str  # "HH:MM" (초 단위 없이 스펙 형식 그대로 유지)
+    card_company: str

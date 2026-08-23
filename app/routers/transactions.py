@@ -10,6 +10,8 @@ from app.models import EmotionTag, Transaction, TransactionEmotion, User
 from app.schemas.auth import MessageResponse
 from app.schemas.emotion import TagEmotionsRequest
 from app.schemas.transaction import (
+    CardMessageParseRequest,
+    CardMessageParseResponse,
     TransactionCreate,
     TransactionCreateResponse,
     TransactionDetailOut,
@@ -17,6 +19,7 @@ from app.schemas.transaction import (
 )
 from app.services import level as level_service
 from app.services import notification as notification_service
+from app.services.card_parser import CardParseError, CardParser
 from app.services.impulse import transaction_impulse_score
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
@@ -59,6 +62,17 @@ def create_transaction(
     level_service.add_exp(db, user, level_service.EXP_TRANSACTION)
     db.commit()
     return TransactionCreateResponse(id=tx.id)
+
+
+@router.post("/parse", response_model=CardMessageParseResponse)
+def parse_card_message(
+    body: CardMessageParseRequest,
+    user: User = Depends(get_current_user),
+):
+    try:
+        return CardParser().parse(body.message_text)
+    except CardParseError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.get("", response_model=list[TransactionOut])
