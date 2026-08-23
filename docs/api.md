@@ -124,6 +124,33 @@ Response:
 
 ## 3. Transactions
 
+### POST /transactions/parse
+카드 결제 문자 파싱 (지원 카드사: 신한/삼성/현대/KB국민/카카오뱅크/NH농협)
+
+Request:
+```json
+{
+  "message_text": "신한카드 승인되었습니다. [혜화역 카페] 5,500원 2026-08-22 14:32"
+}
+```
+
+Response:
+```json
+{
+  "amount": 5500,
+  "merchant": "혜화역 카페",
+  "transaction_date": "2026-08-22",
+  "transaction_time": "14:32",
+  "card_company": "신한카드"
+}
+```
+
+> 파싱 결과는 거래 등록(`POST /transactions`)을 대신하지 않는다. 프론트에서 파싱 결과를
+> 폼에 채운 뒤 사용자가 확인/수정 후 별도로 `POST /transactions`를 호출해야 한다.
+> 지원하지 않는 카드사이거나 필수 항목(금액/날짜/시간/가맹점)을 추출하지 못하면 `422`를 반환한다.
+
+---
+
 ### POST /transactions
 지출/수입 등록
 

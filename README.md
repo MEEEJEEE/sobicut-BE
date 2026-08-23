@@ -191,7 +191,7 @@ MBTI처럼 소비 유형 제공
 
 ### 💰 가계부
 
-* 자동 입력 (문자 파싱)
+* 자동 입력 (카드 결제 문자 파싱 — 신한/삼성/현대/KB국민/카카오뱅크/NH농협 지원)
 * 감정 태그
 * 카테고리 분류
 * 연/월/주/날짜(단건)/유형/카테고리 조합 필터 조회
@@ -261,11 +261,11 @@ app/
 ├── db/              # 세션, Base, 시드 데이터(감정 태그 6종)
 ├── models/          # SQLAlchemy 모델 (ERD v2)
 ├── schemas/         # Pydantic 요청/응답 스키마
-├── services/        # 충동 점수·지갑 온도·BPTI·리포트·레벨 로직
+├── services/        # 충동 점수·지갑 온도·BPTI·리포트·레벨·카드문자파싱 로직
 │   └── weights.json # 충동 점수 가중치 (PCA/설문 산출값으로 교체 예정)
 └── routers/         # API 라우터 (auth/users/transactions/emotions/budget/satisfactions/notifications/reports)
 alembic/             # DB 마이그레이션
-tests/               # pytest 테스트 (28건)
+tests/               # pytest 테스트 (31건)
 ```
 
 > 충동 점수 가중치는 `app/services/weights.json`에 분리되어 있어,
