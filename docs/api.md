@@ -430,6 +430,81 @@ Response:
 
 ---
 
+### GET /notifications/vapid-public-key
+웹 푸시 구독 생성 시 프론트에서 `pushManager.subscribe()`의 `applicationServerKey`로
+사용할 VAPID 공개키. 인증 불필요.
+
+Response:
+```json
+{
+  "public_key": "BP2hSYWVxa09LkZ4NhzkbSM1w23dB00ThxWZ4nbsoHvgwGO..."
+}
+```
+
+---
+
+### POST /notifications/subscribe
+웹 푸시 구독 등록. 브라우저 `PushSubscription.toJSON()` 결과를 그대로 전달하면 된다.
+같은 `endpoint`+`notification_type` 조합으로 다시 호출하면 기존 구독을 갱신한다
+(재구독 시 `is_active`도 다시 활성화).
+
+Request:
+```json
+{
+  "endpoint": "https://fcm.googleapis.com/fcm/send/xxxxx",
+  "keys": {
+    "p256dh": "...",
+    "auth": "..."
+  },
+  "notification_type": "소비컷알림"
+}
+```
+
+> `notification_type`: `"소비컷알림"` | `"만족도조사알림"`
+
+Response:
+```json
+{
+  "message": "구독 등록 완료"
+}
+```
+
+---
+
+### POST /notifications/unsubscribe
+특정 `notification_type` 구독만 해제 (같은 endpoint의 다른 타입 구독은 유지).
+
+Request:
+```json
+{
+  "endpoint": "https://fcm.googleapis.com/fcm/send/xxxxx",
+  "notification_type": "소비컷알림"
+}
+```
+
+Response:
+```json
+{
+  "message": "구독 해제 완료"
+}
+```
+
+---
+
+### POST /notifications/test-push
+로그인한 사용자의 활성 구독 전체로 테스트 알림을 발송한다.
+활성 구독이 없으면 `404`, 구독은 있으나 발송(브라우저 푸시 서비스 응답)에
+실패하면 `502`를 반환한다.
+
+Response:
+```json
+{
+  "message": "테스트 알림을 발송했습니다."
+}
+```
+
+---
+
 ## 8. My Page
 
 ### GET /users/me

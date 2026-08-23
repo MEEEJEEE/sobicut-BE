@@ -12,3 +12,25 @@ class NotificationOut(BaseModel):
     message: str
     is_read: bool
     created_at: datetime
+
+
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscribeRequest(BaseModel):
+    """브라우저의 PushSubscription.toJSON() 결과를 그대로 받는 형태."""
+
+    endpoint: str
+    keys: PushSubscriptionKeys
+    notification_type: str
+
+
+class PushUnsubscribeRequest(BaseModel):
+    endpoint: str
+    notification_type: str
+
+
+class VapidPublicKeyResponse(BaseModel):
+    public_key: str
