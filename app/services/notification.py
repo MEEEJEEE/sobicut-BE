@@ -7,6 +7,9 @@ from app.core.config import settings
 from app.models import Budget, Notification, Transaction, User
 from app.services.common import get_week_of_month
 from app.services.impulse import monthly_spent, transaction_impulse_score
+from app.services.web_push import notify_active_subscribers
+
+PUSH_NOTIFICATION_TYPE = "소비컷알림"
 
 
 def _exists_this_period(db: Session, user_id: int, ntype: str, since: date) -> bool:
@@ -37,14 +40,9 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
             if spent > budget.monthly_budget and not _exists_this_period(
                 db, user.id, "budget_monthly", d.replace(day=1)
             ):
-                db.add(
-                    Notification(
-                        user_id=user.id,
-                        type="budget_monthly",
-                        title="월간 예산 초과",
-                        message="이번 달 예산을 초과했습니다.",
-                    )
-                )
+                title, message = "월간 예산 초과", "이번 달 예산을 초과했습니다."
+                db.add(Notification(user_id=user.id, type="budget_monthly", title=title, message=message))
+                notify_active_subscribers(db, user.id, PUSH_NOTIFICATION_TYPE, title, message)
 
         # 주간 예산 초과 (해당 주차 예산 기준)
         week = get_week_of_month(d)
@@ -65,23 +63,14 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
             if int(week_spent) > week_budget and not _exists_this_period(
                 db, user.id, "budget_weekly", week_start
             ):
-                db.add(
-                    Notification(
-                        user_id=user.id,
-                        type="budget_weekly",
-                        title="주간 예산 초과",
-                        message="이번 주 예산을 초과했습니다.",
-                    )
-                )
+                title, message = "주간 예산 초과", "이번 주 예산을 초과했습니다."
+                db.add(Notification(user_id=user.id, type="budget_weekly", title=title, message=message))
+                notify_active_subscribers(db, user.id, PUSH_NOTIFICATION_TYPE, title, message)
 
     # 충동 소비 경고
     score = transaction_impulse_score(db, tx, user)
     if score >= settings.IMPULSE_THRESHOLD * 100:
-        db.add(
-            Notification(
-                user_id=user.id,
-                type="impulse_warning",
-                title="충동 소비 경고 ✂️",
-                message=f"방금 소비의 충동 점수가 {score}점이에요. 잠시 멈추고 다시 생각해봐요!",
-            )
-        )
+        title = "충동 소비 경고 ✂️"
+        message = f"방금 소비의 충동 점수가 {score}점이에요. 잠시 멈추고 다시 생각해봐요!"
+        db.add(Notification(user_id=user.id, type="impulse_warning", title=title, message=message))
+        notify_active_subscribers(db, user.id, PUSH_NOTIFICATION_TYPE, title, message)

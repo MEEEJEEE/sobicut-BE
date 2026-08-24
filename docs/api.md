@@ -375,12 +375,13 @@ Response:
 
 Query Parameters:
 - `type` (string, optional): 알림 종류 필터
-  - `budget_weekly`: 주간 예산 초과
-  - `budget_monthly`: 월간 예산 초과
-  - `impulse_warning`: 충동 소비 경고
-  - `heatmap_time`: 시간대 소비 패턴 경고
-  - `heatmap_day`: 요일 소비 패턴 경고
-  - `satisfaction_request`: 만족도 입력 요청
+  - `budget_weekly`: 주간 예산 초과 ✅ 구현됨 (거래 등록 시 체크, 소비컷알림 구독자에게 웹 푸시도 함께 발송)
+  - `budget_monthly`: 월간 예산 초과 ✅ 구현됨 (위와 동일)
+  - `impulse_warning`: 충동 소비 경고 ✅ 구현됨 (위와 동일)
+  - `heatmap_time`: 시간대 소비 패턴 경고 ⛔️ 미구현 (트리거 조건 미정)
+  - `heatmap_day`: 요일 소비 패턴 경고 ⛔️ 미구현 (트리거 조건 미정)
+  - `satisfaction_request`: 만족도 입력 요청 ⛔️ 미구현 — 거래 시점이 아니라 N일 후 시점에
+    발송해야 해서 스케줄러(배치) 설계가 필요함. `GET /satisfactions/pending`으로 대상 조회는 가능.
 
 Response:
 ```json
