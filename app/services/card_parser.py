@@ -6,9 +6,8 @@
 추출하고, 인식된 토큰을 모두 제거한 뒤 남는 텍스트를 가맹점명으로 판단한다.
 
 패턴은 신한/삼성/현대/KB국민/NH농협(BC) 카드사의 실제 승인 문자 샘플
-(kakao/credit-card-sms-parser 오픈소스 테스트 픽스처 기준)로 검증했다.
-카카오뱅크는 공개된 실제 샘플을 구하지 못해 동일한 구조를 따르는 것으로 가정한
-추정 포맷이므로, 실제 문자로 재검증이 필요하다.
+(kakao/credit-card-sms-parser 오픈소스 테스트 픽스처 기준)로 검증했고,
+카카오뱅크/KB국민카드는 QA 과정에서 실제 문자로 추가 검증했다.
 """
 import re
 from datetime import date
@@ -33,9 +32,12 @@ class CardParser:
     _ISO_DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
     _SHORT_DATE_RE = re.compile(r"(\d{2})/(\d{2})")
     _TIME_RE = re.compile(r"([01]\d|2[0-3]):([0-5]\d)")
-    _MASK_NAME_RE = re.compile(r"[가-힣*]{2,4}(?:님|(?=[\(（]))")
+    _MASK_NAME_RE = re.compile(r"[가-힣*]{2,4}(?:님|(?=[\(（][\d*]{2,}[\)）]))")
     _MASK_CODE_RE = re.compile(r"[\d*]{2,}")
-    _NOISE_WORDS_RE = re.compile(r"\[Web발신\]|\(Web발신\)|체크카드출금|체크\.승인|승인|일시불")
+    _NOISE_WORDS_RE = re.compile(
+        r"\[Web발신\]|\(Web발신\)|체크카드출금|체크\.승인|승인시각|승인|일시불|"
+        r"출금|계좌|고객명|시각"
+    )
     _COMPANY_SUFFIX_RE = re.compile(r"\(주\)|주식회사")
 
     def parse(self, message_text: str) -> dict:
@@ -125,8 +127,17 @@ class CardParser:
         cleaned = self._TIME_RE.sub(" ", cleaned)
         cleaned = self._MONEY_RE.sub(" ", cleaned)
         cleaned = self._MASK_CODE_RE.sub(" ", cleaned)  # 마스킹된 카드번호/전화번호 등
-        cleaned = re.sub(r"[()（）\[\]]", " ", cleaned)
+        # 노이즈 제거 후 속이 빈 괄호만 지운다. "(CU)"처럼 실제 상호명 일부인
+        # 괄호는 안이 채워져 있으므로 남긴다.
+        cleaned = re.sub(r"[\(（]\s*[\)）]|\[\s*\]", " ", cleaned)
         cleaned = re.sub(r"[.:,\-]+", " ", cleaned)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         cleaned = re.sub(r"\s*(사용|취소)$", "", cleaned).strip()
+
+        # 가맹점 전체를 감싸는 바깥 괄호만 벗겨낸다 (예: "(씨유(CU) 자양한솔점)").
+        if cleaned[:1] in "(（" and cleaned[-1:] in ")）":
+            inner = cleaned[1:-1]
+            if inner.count("(") + inner.count("（") == inner.count(")") + inner.count("）"):
+                cleaned = inner.strip()
+
         return cleaned or None
