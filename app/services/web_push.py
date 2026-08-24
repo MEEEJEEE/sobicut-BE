@@ -41,6 +41,25 @@ def send_push(subscription: PushSubscription, title: str, body: str) -> bool:
         return False
 
 
+def notify_active_subscribers(db: Session, user_id: int, notification_type: str, title: str, body: str) -> None:
+    """해당 notification_type을 구독 중인 활성 구독 전체에 푸시를 발송한다.
+
+    인앱 알림 생성 흐름(예: 거래 등록 직후 예산 초과 체크) 중간에 끼워 호출하므로,
+    구독이 없거나 발송이 실패해도 예외를 올리지 않고 조용히 로깅만 한다.
+    """
+    subscriptions = (
+        db.query(PushSubscription)
+        .filter(
+            PushSubscription.user_id == user_id,
+            PushSubscription.notification_type == notification_type,
+            PushSubscription.is_active.is_(True),
+        )
+        .all()
+    )
+    for sub in subscriptions:
+        send_push(sub, title, body)
+
+
 def send_test_notification(db: Session, user_id: int) -> bool:
     """user_id의 활성 구독 전체에 테스트 알림을 발송한다.
 
