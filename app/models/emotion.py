@@ -17,18 +17,14 @@ class EmotionTag(Base):
 
 
 class TransactionEmotion(Base):
-    """거래 1건당 구매 결정 분류 결과 (거래당 1개).
-
-    사용자가 입력한 의사결정 설명(description)과, 그 설명을 분류한 결과(emotion_tag_id)를 함께 저장한다.
-    """
+    """거래-심리특성 태그 매핑 (N:M, 거래당 최대 4개: 계획여부 1개 + 소비특성 최대 3개)"""
 
     __tablename__ = "transaction_emotions"
-    __table_args__ = (UniqueConstraint("transaction_id", name="uq_transaction_emotion_single"),)
+    __table_args__ = (UniqueConstraint("transaction_id", "emotion_tag_id", name="uq_transaction_emotion"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     transaction_id: Mapped[int] = mapped_column(ForeignKey("transactions.id"), index=True, nullable=False)
     emotion_tag_id: Mapped[int] = mapped_column(ForeignKey("emotion_tags.id"), nullable=False)
-    description: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
     transaction = relationship("Transaction", back_populates="transaction_emotions")
     emotion_tag = relationship("EmotionTag", back_populates="transaction_emotions")

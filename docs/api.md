@@ -245,9 +245,10 @@ Response:
 
 ## 4. Emotion (구매 결정 심리특성)
 
-> v3 변경: "감정 태그 다중 선택" 방식에서 "구매 결정 과정을 자유 서술 → 5개 심리특성 중
-> 하나로 분류" 방식으로 전환. 거래 1건당 분류는 1개만 유지된다 (다시 등록하면 덮어씀).
-> 분류는 현재 규칙/키워드 기반이며, LLM 기반으로 교체 가능하도록 인터페이스를 분리해뒀다.
+> v3: 감정 태그 6종 → 구매 결정 심리특성 5종(스트레스/즉흥성/비교회피/충분한숙고/장기적가치)으로
+> 명칭 변경. 프론트는 "계획 여부"(즉흥성/충분한숙고 중 1개) + "소비 특성"(스트레스/비교회피/
+> 장기적가치 중 최대 3개) 칩을 클릭해서 고른 태그 ID를 그대로 보낸다 — 자유 텍스트 입력이나
+> 서버 쪽 자동 분류는 없다. 거래 1건당 최대 4개, 중복 불가.
 
 ### GET /emotions
 심리특성 목록 전체 조회
@@ -265,55 +266,19 @@ Response:
 
 ---
 
-### POST /emotions/classify
-구매 결정 설명을 5개 심리특성 후보로 분류 (미리보기 — 저장 안 함)
+### POST /transactions/{id}/emotions
+거래에 심리특성 태그 등록 (1~4개, 중복 불가). 호출할 때마다 "현재 선택 상태 전체"로
+간주해서, 이전에 있었지만 이번 요청에 없는 태그는 삭제되고 새로 온 태그만 추가된다
+(부분 추가가 아니라 교체).
 
 Request:
 ```json
 {
-  "description": "스트레스받아서 마음 달래려고 샀음"
+  "emotion_tag_ids": [2, 1, 3]
 }
 ```
 
-Response:
-```json
-{
-  "confidence_level": "auto",
-  "top": { "emotion_tag_id": 1, "name": "스트레스", "bpti_type": "FIRE", "score": 1.0 },
-  "candidates": [
-    { "emotion_tag_id": 1, "name": "스트레스", "bpti_type": "FIRE", "score": 1.0 },
-    { "emotion_tag_id": 2, "name": "즉흥성", "bpti_type": "FOG", "score": 0.0 },
-    { "emotion_tag_id": 3, "name": "비교회피", "bpti_type": "LAZY", "score": 0.0 },
-    { "emotion_tag_id": 4, "name": "충분한숙고", "bpti_type": "SAGE", "score": 0.0 },
-    { "emotion_tag_id": 5, "name": "장기적가치", "bpti_type": "VISION", "score": 0.0 }
-  ]
-}
-```
-
-> `confidence_level`: `top.score` 기준 — `"auto"`(0.7 이상, 자동 확정) |
-> `"top3"`(0.3~0.7, 상위 후보 제시) | `"manual"`(0.3 미만, 전체 수동 선택 유도).
-> 프론트에서 이 값으로 UX를 분기하면 된다.
-
----
-
-### POST /transactions/{id}/emotions
-거래에 구매 결정 심리특성 등록. `emotion_tag_id`를 생략하면 서버가 `description`을
-자동 분류해서 최상위 후보로 저장하고, 값을 주면(사용자가 후보 중 직접 선택) 그대로 사용한다.
-
-Request (자동 분류):
-```json
-{
-  "description": "가격 비교하고 리뷰 읽고 며칠 고민함"
-}
-```
-
-Request (수동 선택 — `/emotions/classify` 응답의 candidates 중 사용자가 고른 것):
-```json
-{
-  "description": "가격 비교하고 리뷰 읽고 며칠 고민함",
-  "emotion_tag_id": 4
-}
-```
+> 예: "아니요, 바로 샀어요"(즉흥성=2) + "스트레스 받아서"(스트레스=1) + "비교 안 하고"(비교회피=3)
 
 Response:
 ```json
@@ -321,6 +286,10 @@ Response:
   "message": "감정 태그 등록 완료"
 }
 ```
+
+에러:
+- 5개 이상 또는 0개 선택, 중복 ID 포함 → `422`
+- 존재하지 않는 태그 ID 포함 → `404`
 
 ---
 

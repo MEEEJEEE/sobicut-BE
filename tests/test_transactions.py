@@ -65,77 +65,58 @@ def test_emotion_list_has_5_characteristics(client, auth_headers):
     assert {e["name"] for e in emotions} == {"스트레스", "즉흥성", "비교회피", "충분한숙고", "장기적가치"}
 
 
-def test_emotion_classify_preview(client, auth_headers):
-    res = client.post(
-        "/emotions/classify", json={"description": "스트레스받아서 마음 달래려고 샀음"}, headers=auth_headers
-    )
-    assert res.status_code == 200
-    data = res.json()
-    assert data["top"]["bpti_type"] == "FIRE"
-    assert data["top"]["name"] == "스트레스"
-    assert len(data["candidates"]) == 5
-    assert data["confidence_level"] in {"auto", "top3", "manual"}
-
-
-def test_emotion_tagging_auto_classify(client, auth_headers):
-    tx_id = client.post("/transactions", json=TX_BODY, headers=auth_headers).json()["id"]
-
-    res = client.post(
-        f"/transactions/{tx_id}/emotions",
-        json={"description": "가격 비교하고 리뷰 읽고 며칠 고민함"},
-        headers=auth_headers,
-    )
-    assert res.status_code == 200
-
-    tags = client.get(f"/transactions/{tx_id}", headers=auth_headers).json()["emotion_tags"]
-    assert tags[0]["name"] == "충분한숙고"
-
-
-def test_emotion_tagging_manual_override(client, auth_headers):
-    tx_id = client.post("/transactions", json=TX_BODY, headers=auth_headers).json()["id"]
-
+def _emotion_ids(client, auth_headers, *names):
     emotions = client.get("/emotions", headers=auth_headers).json()
-    vision_id = next(e["id"] for e in emotions if e["name"] == "장기적가치")
-
-    res = client.post(
-        f"/transactions/{tx_id}/emotions",
-        json={"description": "애매한 설명이지만 내가 직접 골랐음", "emotion_tag_id": vision_id},
-        headers=auth_headers,
-    )
-    assert res.status_code == 200
-
-    tags = client.get(f"/transactions/{tx_id}", headers=auth_headers).json()["emotion_tags"]
-    assert tags[0]["name"] == "장기적가치"
+    by_name = {e["name"]: e["id"] for e in emotions}
+    return [by_name[n] for n in names]
 
 
-def test_emotion_tagging_reclassify_overwrites(client, auth_headers):
-    """같은 거래에 다시 호출하면 기존 분류를 덮어써야 한다 (거래당 분류 1개)."""
+def test_emotion_tagging_multi_select(client, auth_headers):
+    """계획 여부(즉흥성) + 소비 특성(스트레스, 비교회피) = 3개 다중 선택"""
     tx_id = client.post("/transactions", json=TX_BODY, headers=auth_headers).json()["id"]
+    ids = _emotion_ids(client, auth_headers, "즉흥성", "스트레스", "비교회피")
 
-    client.post(
-        f"/transactions/{tx_id}/emotions",
-        json={"description": "스트레스받아서 샀음"},
-        headers=auth_headers,
-    )
-    res = client.post(
-        f"/transactions/{tx_id}/emotions",
-        json={"description": "그냥 눈에 띄어서 샀음"},
-        headers=auth_headers,
-    )
+    res = client.post(f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": ids}, headers=auth_headers)
     assert res.status_code == 200
 
-    tags = client.get(f"/transactions/{tx_id}", headers=auth_headers).json()["emotion_tags"]
-    assert len(tags) == 1
-    assert tags[0]["name"] == "즉흥성"
+    tags = {t["name"] for t in client.get(f"/transactions/{tx_id}", headers=auth_headers).json()["emotion_tags"]}
+    assert tags == {"즉흥성", "스트레스", "비교회피"}
+
+
+def test_emotion_tagging_max_4(client, auth_headers):
+    tx_id = client.post("/transactions", json=TX_BODY, headers=auth_headers).json()["id"]
+    ids = _emotion_ids(client, auth_headers, "스트레스", "즉흥성", "비교회피", "충분한숙고", "장기적가치")
+
+    res = client.post(f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": ids}, headers=auth_headers)
+    assert res.status_code == 422
+
+
+def test_emotion_tagging_duplicate_rejected(client, auth_headers):
+    tx_id = client.post("/transactions", json=TX_BODY, headers=auth_headers).json()["id"]
+    stress_id = _emotion_ids(client, auth_headers, "스트레스")[0]
+
+    res = client.post(
+        f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": [stress_id, stress_id]}, headers=auth_headers
+    )
+    assert res.status_code == 422
+
+
+def test_emotion_tagging_resend_replaces_selection(client, auth_headers):
+    """다시 호출하면 이전에 보냈던 태그 중 이번에 빠진 건 삭제되고, 새로 온 것만 반영된다 (교체 방식)."""
+    tx_id = client.post("/transactions", json=TX_BODY, headers=auth_headers).json()["id"]
+    stress_id, fog_id, lazy_id = _emotion_ids(client, auth_headers, "스트레스", "즉흥성", "비교회피")
+
+    client.post(f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": [stress_id, fog_id]}, headers=auth_headers)
+    res = client.post(f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": [fog_id, lazy_id]}, headers=auth_headers)
+    assert res.status_code == 200
+
+    tags = {t["name"] for t in client.get(f"/transactions/{tx_id}", headers=auth_headers).json()["emotion_tags"]}
+    assert tags == {"즉흥성", "비교회피"}  # 스트레스는 빠졌으니 삭제, 비교회피는 새로 추가
 
 
 def test_emotion_tagging_invalid_id(client, auth_headers):
     tx_id = client.post("/transactions", json=TX_BODY, headers=auth_headers).json()["id"]
-    res = client.post(
-        f"/transactions/{tx_id}/emotions",
-        json={"description": "설명", "emotion_tag_id": 999},
-        headers=auth_headers,
-    )
+    res = client.post(f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": [9999]}, headers=auth_headers)
     assert res.status_code == 404
 
 
