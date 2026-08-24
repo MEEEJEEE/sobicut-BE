@@ -63,7 +63,11 @@ def _setup_spending(client, auth_headers):
         },
         headers=auth_headers,
     ).json()["id"]
-    client.post(f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": [stress_id]}, headers=auth_headers)
+    client.post(
+        f"/transactions/{tx_id}/emotions",
+        json={"description": "스트레스받아서 구매", "emotion_tag_id": stress_id},
+        headers=auth_headers,
+    )
     return tx_id
 
 

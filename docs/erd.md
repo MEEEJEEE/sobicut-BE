@@ -34,15 +34,16 @@ User → Transaction → Emotion → Analysis
 - transaction_time
 - created_at
 
-### EmotionTag
+### EmotionTag (구매 결정 심리특성, v3)
 - id (PK)
-- name → `"스트레스"` | `"무의식"` | `"귀찮음"` | `"성취"` | `"행복"` | `"고마움"`
+- name → `"스트레스"` | `"즉흥성"` | `"비교회피"` | `"충분한숙고"` | `"장기적가치"`
 - type → `"negative"` | `"positive"`
 
 ### TransactionEmotion
 - id (PK)
-- transaction_id (FK)
+- transaction_id (FK, unique — 거래당 분류 1개)
 - emotion_tag_id (FK)
+- description → 사용자가 입력한 구매 결정 설명 (자동/수동 분류의 근거 텍스트)
 
 ### Budget
 - id (PK)

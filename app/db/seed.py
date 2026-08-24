@@ -3,19 +3,18 @@ from sqlalchemy.orm import Session
 from app.models import EmotionTag
 
 EMOTION_TAGS = [
-    # 결핍형 소비 (부정)
+    # 즉흥/회피형 의사결정
     {"name": "스트레스", "type": "negative"},
-    {"name": "무의식", "type": "negative"},
-    {"name": "귀찮음", "type": "negative"},
-    # 충만형 소비 (긍정)
-    {"name": "성취", "type": "positive"},
-    {"name": "행복", "type": "positive"},
-    {"name": "고마움", "type": "positive"},
+    {"name": "즉흥성", "type": "negative"},
+    {"name": "비교회피", "type": "negative"},
+    # 숙고/가치형 의사결정
+    {"name": "충분한숙고", "type": "positive"},
+    {"name": "장기적가치", "type": "positive"},
 ]
 
 
 def seed_emotion_tags(db: Session) -> None:
-    """감정 태그 6종 초기 데이터. 이미 있으면 건너뜀."""
+    """구매 결정 심리특성 5종 초기 데이터. 이미 있으면 건너뜀."""
     if db.query(EmotionTag).count() > 0:
         return
     for tag in EMOTION_TAGS:

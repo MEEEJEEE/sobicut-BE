@@ -1,4 +1,4 @@
-"""BPTI (Buying Pattern Type Indicator): 주력 감정 태그 기반 소비 성격 유형"""
+"""BPTI (Buying Pattern Type Indicator): 주력 구매 결정 심리특성 기반 소비 성격 유형"""
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
@@ -7,19 +7,18 @@ from app.models import EmotionTag, Transaction, TransactionEmotion
 BPTI_TYPES = {
     "스트레스": {"type": "FIRE", "label": "불지옥", "definition": "홧김 비용의 지배자",
              "message": "화가 날 때 지갑을 여는 타입! 스트레스 해소법을 돈 쓰기 말고 다른 걸로 찾아봐요."},
-    "무의식": {"type": "FOG", "label": "안개 속", "definition": "새어 나가는 돈의 달인",
-            "message": "정신 차려보니 결제 완료? 멍하니 쓴 작은 돈들이 모여 큰 산이 되고 있어요."},
-    "귀찮음": {"type": "LAZY", "label": "귀찮니즘", "definition": "편리함과 돈을 바꾼 자",
-            "message": "귀찮음으로 시작된 배달과 택시가 삶의 동반자군요. 몸은 편하지만 지갑은 비명을 지르고 있어요!"},
-    "성취": {"type": "REWARD", "label": "보상왕", "definition": "성취를 결제로 증명하는 자",
-           "message": "고생한 나를 아낄 줄 아는 타입! 계획적인 보상이라면 온도는 안전해요."},
-    "행복": {"type": "JOY", "label": "행복 요정", "definition": "인생의 즐거움을 아는 자",
-           "message": "좋아하는 것에 돈을 쓸 때 가장 빛나요. 행복 지수가 지갑 온도보다 높네요!"},
-    "고마움": {"type": "GIVER", "label": "기부 천사", "definition": "관계에 진심인 큰 손",
-            "message": "주변 사람들의 행복이 곧 나의 행복! 온기가 가득한 지갑입니다. 당신, 혹시 천사인가요?"},
+    "즉흥성": {"type": "FOG", "label": "안개 속", "definition": "충동이 이끄는 대로 사는 자",
+            "message": "고민할 틈도 없이 결제 완료? 순간의 끌림이 지갑을 자주 여는 편이에요."},
+    "비교회피": {"type": "LAZY", "label": "귀찮니즘", "definition": "비교보다 편리함을 택한 자",
+             "message": "익숙한 걸 그냥 사는 편이군요. 가끔은 다른 선택지도 비교해봐요!"},
+    "충분한숙고": {"type": "SAGE", "label": "신중한 현자", "definition": "따져보고 결정하는 자",
+              "message": "비교하고 고민한 뒤에 결제하는 타입! 계획적인 소비 습관이 지갑을 지켜주고 있어요."},
+    "장기적가치": {"type": "VISION", "label": "가치 투자자", "definition": "의미와 관계에 진심인 자",
+              "message": "지금 당장보다 앞으로의 가치를 보고 쓰는 편이네요. 나와 주변을 위한 소비, 멋져요!"},
 }
 
 EMOTION_NAMES = list(BPTI_TYPES.keys())
+NAME_BY_BPTI_TYPE = {v["type"]: name for name, v in BPTI_TYPES.items()}
 
 
 def emotion_tag_counts(db: Session, user_id: int, year: int, month: int) -> dict[str, int]:
@@ -43,7 +42,7 @@ def emotion_tag_counts(db: Session, user_id: int, year: int, month: int) -> dict
 
 
 def emotion_radar(db: Session, user_id: int, year: int, month: int) -> dict[str, int]:
-    """감정 태그별 비율(%) — 6각형 레이더 그래프용"""
+    """심리특성별 비율(%) — 5각형 레이더 그래프용"""
     counts = emotion_tag_counts(db, user_id, year, month)
     total = sum(counts.values())
     if total == 0:
