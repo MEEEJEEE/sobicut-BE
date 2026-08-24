@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.scheduler import init_scheduler, shutdown_scheduler
 from app.db.base import Base
 from app.db.seed import seed_emotion_tags
 from app.db.session import SessionLocal, engine
@@ -19,7 +20,10 @@ async def lifespan(app: FastAPI):
         seed_emotion_tags(db)
     finally:
         db.close()
+
+    init_scheduler()
     yield
+    shutdown_scheduler()
 
 
 app = FastAPI(

@@ -380,8 +380,11 @@ Query Parameters:
   - `impulse_warning`: 충동 소비 경고 ✅ 구현됨 (위와 동일)
   - `heatmap_time`: 시간대 소비 패턴 경고 ⛔️ 미구현 (트리거 조건 미정)
   - `heatmap_day`: 요일 소비 패턴 경고 ⛔️ 미구현 (트리거 조건 미정)
-  - `satisfaction_request`: 만족도 입력 요청 ⛔️ 미구현 — 거래 시점이 아니라 N일 후 시점에
-    발송해야 해서 스케줄러(배치) 설계가 필요함. `GET /satisfactions/pending`으로 대상 조회는 가능.
+  - `satisfaction_request`: 만족도 입력 요청 ✅ 구현됨 — 고가 소비(5만원 이상) 후
+    정확히 7일/30일째 되는 날 매일 09:00(KST) 배치로 인앱 알림 + 만족도조사알림
+    구독자에게 웹 푸시 발송. `satisfaction_notification_logs` 테이블로 중복 발송 방지.
+    (참고: `GET /satisfactions/pending`은 이 배치와 별개로, 마감일이 지났고 아직
+    미제출인 건을 그때그때 계산해서 보여주는 용도라 배치 발송 여부와 무관하게 계속 조회 가능)
 
 Response:
 ```json

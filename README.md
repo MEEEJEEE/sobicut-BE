@@ -217,7 +217,8 @@ MBTI처럼 소비 유형 제공
 
 ### 🔔 알림
 
-* 예산 초과 / 충동 경고 / 소비 패턴 알림 (인앱)
+* 예산 초과 / 충동 경고 알림 (인앱 + 웹 푸시)
+* 고가 소비 만족도 조사 알림 (7일/30일 후 자동 배치, 매일 09:00 KST)
 * 웹 푸시 구독/해제 (VAPID, 알림 종류별 개별 on/off)
 
 ---
@@ -264,16 +265,16 @@ pytest
 ```
 app/
 ├── main.py          # FastAPI 앱 진입점
-├── core/            # 설정, JWT 보안, 의존성
+├── core/            # 설정, JWT 보안, 의존성, 배치 스케줄러(APScheduler)
 ├── db/              # 세션, Base, 시드 데이터(감정 태그 6종)
 ├── models/          # SQLAlchemy 모델 (ERD v2)
 ├── schemas/         # Pydantic 요청/응답 스키마
-├── services/        # 충동 점수·지갑 온도·BPTI·리포트·레벨·카드문자파싱·웹푸시 로직
+├── services/        # 충동 점수·지갑 온도·BPTI·리포트·레벨·카드문자파싱·웹푸시·만족도배치 로직
 │   └── weights.json # 충동 점수 가중치 (PCA/설문 산출값으로 교체 예정)
 └── routers/         # API 라우터 (auth/users/transactions/emotions/budget/satisfactions/notifications/reports)
 alembic/             # DB 마이그레이션
 scripts/             # VAPID 키 생성 등 1회성 스크립트
-tests/               # pytest 테스트 (37건)
+tests/               # pytest 테스트 (43건)
 ```
 
 > 충동 점수 가중치는 `app/services/weights.json`에 분리되어 있어,

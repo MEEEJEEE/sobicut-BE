@@ -1,9 +1,6 @@
-from datetime import date, timedelta
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models import Satisfaction, Transaction, User
@@ -13,10 +10,9 @@ from app.schemas.satisfaction import (
     SatisfactionCreateResponse,
 )
 from app.services import level as level_service
+from app.services.satisfaction import DAY_TYPES, due_satisfaction_targets
 
 router = APIRouter(prefix="/satisfactions", tags=["Satisfaction"])
-
-DAY_TYPES = {"7일": 7, "30일": 30}
 
 
 @router.post("", response_model=SatisfactionCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -65,30 +61,13 @@ def pending_satisfactions(
     db: Session = Depends(get_db),
 ):
     """고가 소비(기준액 이상) 중 만족도 미입력 건 조회 (팝업 트리거용)"""
-    today = date.today()
-    txs = (
-        db.query(Transaction)
-        .filter(
-            Transaction.user_id == user.id,
-            Transaction.type == "expense",
-            Transaction.amount >= settings.HIGH_PRICE_THRESHOLD,
+    return [
+        PendingSatisfactionOut(
+            transaction_id=tx.id,
+            merchant=tx.merchant,
+            amount=tx.amount,
+            day_type=day_type,
+            due_date=due,
         )
-        .all()
-    )
-
-    pending = []
-    for tx in txs:
-        submitted = {s.day_type for s in tx.satisfactions}
-        for day_type, days in DAY_TYPES.items():
-            due = tx.transaction_date + timedelta(days=days)
-            if day_type not in submitted and today >= due:
-                pending.append(
-                    PendingSatisfactionOut(
-                        transaction_id=tx.id,
-                        merchant=tx.merchant,
-                        amount=tx.amount,
-                        day_type=day_type,
-                        due_date=due,
-                    )
-                )
-    return pending
+        for tx, day_type, due in due_satisfaction_targets(db, user.id)
+    ]
