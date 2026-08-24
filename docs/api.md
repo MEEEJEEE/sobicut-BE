@@ -243,32 +243,75 @@ Response:
 
 ---
 
-## 4. Emotion
+## 4. Emotion (구매 결정 심리특성)
+
+> v3 변경: "감정 태그 다중 선택" 방식에서 "구매 결정 과정을 자유 서술 → 5개 심리특성 중
+> 하나로 분류" 방식으로 전환. 거래 1건당 분류는 1개만 유지된다 (다시 등록하면 덮어씀).
+> 분류는 현재 규칙/키워드 기반이며, LLM 기반으로 교체 가능하도록 인터페이스를 분리해뒀다.
 
 ### GET /emotions
-감정 태그 목록 전체 조회
+심리특성 목록 전체 조회
 
 Response:
 ```json
 [
-  { "id": 1, "name": "스트레스", "type": "negative" },
-  { "id": 2, "name": "무의식",   "type": "negative" },
-  { "id": 3, "name": "귀찮음",   "type": "negative" },
-  { "id": 4, "name": "성취",     "type": "positive" },
-  { "id": 5, "name": "행복",     "type": "positive" },
-  { "id": 6, "name": "고마움",   "type": "positive" }
+  { "id": 1, "name": "스트레스",   "type": "negative" },
+  { "id": 2, "name": "즉흥성",     "type": "negative" },
+  { "id": 3, "name": "비교회피",   "type": "negative" },
+  { "id": 4, "name": "충분한숙고", "type": "positive" },
+  { "id": 5, "name": "장기적가치", "type": "positive" }
 ]
 ```
 
 ---
 
-### POST /transactions/{id}/emotions
-거래에 감정 태그 등록
+### POST /emotions/classify
+구매 결정 설명을 5개 심리특성 후보로 분류 (미리보기 — 저장 안 함)
 
 Request:
 ```json
 {
-  "emotion_tag_ids": [1, 2]
+  "description": "스트레스받아서 마음 달래려고 샀음"
+}
+```
+
+Response:
+```json
+{
+  "confidence_level": "auto",
+  "top": { "emotion_tag_id": 1, "name": "스트레스", "bpti_type": "FIRE", "score": 1.0 },
+  "candidates": [
+    { "emotion_tag_id": 1, "name": "스트레스", "bpti_type": "FIRE", "score": 1.0 },
+    { "emotion_tag_id": 2, "name": "즉흥성", "bpti_type": "FOG", "score": 0.0 },
+    { "emotion_tag_id": 3, "name": "비교회피", "bpti_type": "LAZY", "score": 0.0 },
+    { "emotion_tag_id": 4, "name": "충분한숙고", "bpti_type": "SAGE", "score": 0.0 },
+    { "emotion_tag_id": 5, "name": "장기적가치", "bpti_type": "VISION", "score": 0.0 }
+  ]
+}
+```
+
+> `confidence_level`: `top.score` 기준 — `"auto"`(0.7 이상, 자동 확정) |
+> `"top3"`(0.3~0.7, 상위 후보 제시) | `"manual"`(0.3 미만, 전체 수동 선택 유도).
+> 프론트에서 이 값으로 UX를 분기하면 된다.
+
+---
+
+### POST /transactions/{id}/emotions
+거래에 구매 결정 심리특성 등록. `emotion_tag_id`를 생략하면 서버가 `description`을
+자동 분류해서 최상위 후보로 저장하고, 값을 주면(사용자가 후보 중 직접 선택) 그대로 사용한다.
+
+Request (자동 분류):
+```json
+{
+  "description": "가격 비교하고 리뷰 읽고 며칠 고민함"
+}
+```
+
+Request (수동 선택 — `/emotions/classify` 응답의 candidates 중 사용자가 고른 것):
+```json
+{
+  "description": "가격 비교하고 리뷰 읽고 며칠 고민함",
+  "emotion_tag_id": 4
 }
 ```
 
@@ -660,11 +703,10 @@ Response:
   },
   "emotion_breakdown": {
     "스트레스": 0.4,
-    "무의식": 0.2,
-    "귀찮음": 0.1,
-    "성취": 0.1,
-    "행복": 0.1,
-    "고마움": 0.1
+    "즉흥성": 0.2,
+    "비교회피": 0.1,
+    "충분한숙고": 0.2,
+    "장기적가치": 0.1
   },
   "top_impulse_transactions": [
     {
@@ -734,11 +776,10 @@ Response:
   "message": "화가 날 때 지갑을 여는 타입! 스트레스 해소법을 돈 쓰기 말고 다른 걸로 찾아봐요.",
   "emotion_radar": {
     "스트레스": 40,
-    "무의식": 20,
-    "귀찮음": 10,
-    "성취": 10,
-    "행복": 15,
-    "고마움": 5
+    "즉흥성": 20,
+    "비교회피": 10,
+    "충분한숙고": 20,
+    "장기적가치": 10
   }
 }
 ```

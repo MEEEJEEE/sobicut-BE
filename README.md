@@ -39,14 +39,14 @@
 
 ---
 
-### 2. 🧠 감정 기반 소비 분석
+### 2. 🧠 구매 결정 심리특성 분석
 
-소비 시 감정 태그 입력
+구매 결정 과정을 자유 서술로 입력 → 5개 심리특성으로 자동/수동 분류
 
-* 스트레스 / 무의식 / 귀찮음
-* 성취 / 행복 / 고마움
+* 스트레스 / 즉흥성 / 비교회피
+* 충분한숙고 / 장기적가치
 
-👉 "왜 썼는지"를 데이터로 기록
+👉 "왜 그렇게 결정했는지"를 데이터로 기록
 
 ---
 
@@ -83,8 +83,8 @@ MBTI처럼 소비 유형 제공
 예시:
 
 * FIRE 🔥 : 스트레스 소비형
-* FOG 🌫️ : 무의식 소비형
-* JOY ✨ : 행복 소비형
+* FOG 🌫️ : 즉흥 소비형
+* SAGE 🦉 : 신중한 숙고형
 
 👉 자기 인식 강화
 
@@ -266,7 +266,7 @@ pytest
 app/
 ├── main.py          # FastAPI 앱 진입점
 ├── core/            # 설정, JWT 보안, 의존성, 배치 스케줄러(APScheduler)
-├── db/              # 세션, Base, 시드 데이터(감정 태그 6종)
+├── db/              # 세션, Base, 시드 데이터(구매 결정 심리특성 5종)
 ├── models/          # SQLAlchemy 모델 (ERD v2)
 ├── schemas/         # Pydantic 요청/응답 스키마
 ├── services/        # 충동 점수·지갑 온도·BPTI·리포트·레벨·카드문자파싱·웹푸시·만족도배치 로직
@@ -274,7 +274,7 @@ app/
 └── routers/         # API 라우터 (auth/users/transactions/emotions/budget/satisfactions/notifications/reports)
 alembic/             # DB 마이그레이션
 scripts/             # VAPID 키 생성 등 1회성 스크립트
-tests/               # pytest 테스트 (43건)
+tests/               # pytest 테스트 (47건)
 ```
 
 > 충동 점수 가중치는 `app/services/weights.json`에 분리되어 있어,
