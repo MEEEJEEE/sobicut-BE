@@ -17,9 +17,8 @@ from app.schemas.transaction import (
     TransactionDetailOut,
     TransactionOut,
 )
-from app.services import decision_classifier, level as level_service
+from app.services import level as level_service
 from app.services import notification as notification_service
-from app.services.bpti import NAME_BY_BPTI_TYPE
 from app.services.card_parser import CardParseError, CardParser
 from app.services.impulse import transaction_impulse_score
 
@@ -156,31 +155,31 @@ def tag_emotions(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """구매 결정 설명을 저장하고 심리특성으로 분류한다.
+    """거래에 구매 결정 심리특성 태그를 등록한다 (거래당 최대 4개, 중복 선택 불가).
 
-    emotion_tag_id를 함께 보내면(사용자가 후보 중 직접 선택) 그 값을 그대로 쓰고,
-    없으면 서버가 description을 자동 분류(decision_classifier)해서 최상위 후보로 저장한다.
-    거래 1건당 분류는 1개만 유지 — 다시 호출하면 기존 분류를 덮어쓴다.
+    "계획 여부"(즉흥성/충분한숙고 중 1개) + "소비 특성"(스트레스/비교회피/장기적가치 중 최대 3개)를
+    프론트가 emotion_tag_id로 매핑해서 그대로 보낸다. 매 호출은 "현재 선택 상태 전체"를
+    의미하므로, 요청에 없는 기존 태그는 삭제하고 새로 추가된 태그만 insert한다(교체 방식).
     """
     tx = _get_owned_transaction(db, user, transaction_id)
 
-    if body.emotion_tag_id is not None:
-        tag = db.query(EmotionTag).filter(EmotionTag.id == body.emotion_tag_id).first()
-        if tag is None:
-            raise HTTPException(status_code=404, detail="존재하지 않는 감정 태그입니다.")
-    else:
-        top_type = decision_classifier.classify(body.description)[0]["type"]
-        tag = db.query(EmotionTag).filter(EmotionTag.name == NAME_BY_BPTI_TYPE[top_type]).first()
-        if tag is None:
-            raise HTTPException(status_code=500, detail="분류 결과에 해당하는 감정 태그를 찾을 수 없습니다.")
+    requested_ids = set(body.emotion_tag_ids)
+    tags = db.query(EmotionTag).filter(EmotionTag.id.in_(requested_ids)).all()
+    if len(tags) != len(requested_ids):
+        raise HTTPException(status_code=404, detail="존재하지 않는 감정 태그가 포함되어 있습니다.")
 
-    existing = tx.transaction_emotions[0] if tx.transaction_emotions else None
-    if existing:
-        existing.emotion_tag_id = tag.id
-        existing.description = body.description
-    else:
-        db.add(TransactionEmotion(transaction_id=tx.id, emotion_tag_id=tag.id, description=body.description))
+    existing_ids = {te.emotion_tag_id for te in tx.transaction_emotions}
+
+    for te in list(tx.transaction_emotions):
+        if te.emotion_tag_id not in requested_ids:
+            db.delete(te)
+
+    added = False
+    for tag_id in requested_ids - existing_ids:
+        db.add(TransactionEmotion(transaction_id=tx.id, emotion_tag_id=tag_id))
+        added = True
+
+    if added:
         level_service.add_exp(db, user, level_service.EXP_EMOTION_TAG)
-
     db.commit()
     return MessageResponse(message="감정 태그 등록 완료")

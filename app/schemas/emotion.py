@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class EmotionOut(BaseModel):
@@ -9,23 +9,14 @@ class EmotionOut(BaseModel):
     type: str
 
 
-class DecisionClassifyRequest(BaseModel):
-    description: str = Field(min_length=1, max_length=300)
-
-
-class DecisionCandidateOut(BaseModel):
-    emotion_tag_id: int
-    name: str
-    bpti_type: str  # FIRE | FOG | LAZY | SAGE | VISION
-    score: float
-
-
-class DecisionClassifyResponse(BaseModel):
-    confidence_level: str  # auto | top3 | manual
-    top: DecisionCandidateOut
-    candidates: list[DecisionCandidateOut]
-
-
 class TagEmotionsRequest(BaseModel):
-    description: str = Field(min_length=1, max_length=300)
-    emotion_tag_id: int | None = None  # 후보 중 사용자가 직접 골랐을 때만 지정. 없으면 서버가 자동 분류.
+    emotion_tag_ids: list[int]
+
+    @field_validator("emotion_tag_ids")
+    @classmethod
+    def validate_emotion_tag_ids(cls, v: list[int]) -> list[int]:
+        if not (1 <= len(v) <= 4):
+            raise ValueError("감정 태그는 최소 1개, 최대 4개까지 선택 가능합니다.")
+        if len(v) != len(set(v)):
+            raise ValueError("중복된 태그는 선택할 수 없습니다.")
+        return v

@@ -41,9 +41,8 @@ User → Transaction → Emotion → Analysis
 
 ### TransactionEmotion
 - id (PK)
-- transaction_id (FK, unique — 거래당 분류 1개)
-- emotion_tag_id (FK)
-- description → 사용자가 입력한 구매 결정 설명 (자동/수동 분류의 근거 텍스트)
+- transaction_id (FK)
+- emotion_tag_id (FK) → (transaction_id, emotion_tag_id) unique, 거래당 최대 4개
 
 ### Budget
 - id (PK)
