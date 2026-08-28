@@ -546,11 +546,11 @@ Response:
 Response:
 ```json
 {
-  "level": 3,
-  "level_name": "몬스터",
-  "current_exp": 420,
-  "next_level_exp": 600,
-  "description": "소비 습관이 조금씩 성장하고 있어요!"
+  "level": 2,
+  "level_name": "박스 몬스터",
+  "current_exp": 56,
+  "next_level_exp": 90,
+  "description": "지갑의 뼈대가 잡히고 있어요! 소비 습관이 조금씩 성장하고 있어요."
 }
 ```
 
