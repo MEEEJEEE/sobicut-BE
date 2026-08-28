@@ -4,8 +4,8 @@ def test_my_page(client, auth_headers):
     assert me["residence_type"] == "자취"
 
     level = client.get("/users/me/level", headers=auth_headers).json()
-    assert level["level"] == 1
-    assert level["level_name"] == "슬라임"
+    assert level["level"] == 0
+    assert level["level_name"] == "슬라임 커티"
 
 
 def test_update_profile_fields(client, auth_headers):
