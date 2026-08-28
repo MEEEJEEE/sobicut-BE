@@ -19,10 +19,14 @@ LEVEL_DESCRIPTIONS = {
     5: "당신은 금융의 신! 소비를 완전히 지배하고 있어요!",
 }
 
-# 경험치 지급 기준
-EXP_TRANSACTION = 5      # 거래 기록
-EXP_EMOTION_TAG = 3      # 감정 태그 입력
-EXP_SATISFACTION = 10    # 만족도 입력
+# 경험치 지급 기준 — 단순 기록 행위는 낮게, 좋은 소비 습관에는 보너스로 방향을 맞춘다.
+EXP_TRANSACTION = 2          # 거래 기록
+EXP_EMOTION_TAG = 2          # 감정 태그 입력
+EXP_SATISFACTION = 10        # 만족도 입력 (자주 없는 행동이라 그대로 유지)
+EXP_LOW_IMPULSE_BONUS = 5    # 신중한 소비(충동 점수 낮음) 보너스
+EXP_BUDGET_COMPLIANCE_BONUS = 15  # 월간 예산 준수 마감 보너스
+
+LOW_IMPULSE_THRESHOLD = 30   # 이 점수 미만이면 "신중한 소비"로 보너스 지급
 
 
 def calc_level(exp: int) -> int:

@@ -29,6 +29,7 @@ class User(Base):
     income_level: Mapped[str] = mapped_column(String(20), nullable=False)  # under-30 | 30-60 | 60-100 | over-100
     level: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     exp: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_budget_bonus_month: Mapped[str | None] = mapped_column(String(7), nullable=True)  # "YYYY-MM", 중복 지급 방지
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # soft delete
 
