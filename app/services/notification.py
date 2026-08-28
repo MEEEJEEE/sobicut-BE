@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import Budget, Notification, Transaction, User
+from app.services import level as level_service
 from app.services.common import get_week_of_month
 from app.services.impulse import monthly_spent, transaction_impulse_score
 from app.services.web_push import notify_active_subscribers
@@ -74,3 +75,6 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
         message = f"방금 소비의 충동 점수가 {score}점이에요. 잠시 멈추고 다시 생각해봐요!"
         db.add(Notification(user_id=user.id, type="impulse_warning", title=title, message=message))
         notify_active_subscribers(db, user.id, PUSH_NOTIFICATION_TYPE, title, message)
+    elif score < level_service.LOW_IMPULSE_THRESHOLD:
+        # 신중한 소비 보너스 — 좋은 소비 습관이 exp/레벨업에 직접 반영되도록
+        level_service.add_exp(db, user, level_service.EXP_LOW_IMPULSE_BONUS)
