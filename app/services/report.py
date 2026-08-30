@@ -117,6 +117,20 @@ def budget_status(db: Session, user_id: int, year: int, month: int) -> dict:
     }
 
 
+def monthly_spending_history(db: Session, user_id: int, year: int, month: int, months: int = 4) -> list[dict]:
+    """이번 달을 제외한 과거 N개월 실제 지출액 (오래된 순). 막대 차트용."""
+    history = []
+    y, m = year, month
+    for _ in range(months):
+        m -= 1
+        if m == 0:
+            m, y = 12, y - 1
+        spent = sum(t.amount for t in _month_expenses(db, user_id, y, m))
+        history.append({"year": y, "month": m, "spent": spent})
+    history.reverse()
+    return history
+
+
 def monthly_forecast(db: Session, user_id: int, year: int, month: int) -> dict:
     """일평균 기반 월말 지출 예측 (AI 파트 회귀 모델로 고도화 예정)"""
     budget = db.query(Budget).filter(Budget.user_id == user_id).first()
@@ -140,6 +154,9 @@ def monthly_forecast(db: Session, user_id: int, year: int, month: int) -> dict:
     else:
         confidence = "low"
 
+    history = monthly_spending_history(db, user_id, year, month)
+    monthly_average = round(sum(h["spent"] for h in history) / len(history)) if history else 0
+
     return {
         "current_spent": spent,
         "predicted_total": predicted,
@@ -147,6 +164,8 @@ def monthly_forecast(db: Session, user_id: int, year: int, month: int) -> dict:
         "predicted_remaining": monthly_budget - predicted,
         "is_over_budget": predicted > monthly_budget if monthly_budget else False,
         "confidence": confidence,
+        "history": history,
+        "monthly_average": monthly_average,
     }
 
 

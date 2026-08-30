@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
-from app.models import EmotionTag, Transaction, TransactionEmotion, User
+from app.models import EmotionTag, Satisfaction, Transaction, TransactionEmotion, User
 from app.schemas.auth import MessageResponse
 from app.schemas.emotion import TagEmotionsRequest
+from app.schemas.satisfaction import SatisfactionRecordOut
 from app.schemas.transaction import (
     CardMessageParseRequest,
     CardMessageParseResponse,
@@ -21,6 +22,7 @@ from app.services import level as level_service
 from app.services import notification as notification_service
 from app.services.card_parser import CardParseError, CardParser
 from app.services.impulse import transaction_impulse_score
+from app.services.satisfaction import DAY_TYPES
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
@@ -119,6 +121,24 @@ def get_transaction(
     detail = TransactionDetailOut.model_validate(tx, from_attributes=True)
     detail.impulse_score = transaction_impulse_score(db, tx, user)
     return detail
+
+
+@router.get("/{transaction_id}/satisfactions", response_model=list[SatisfactionRecordOut])
+def get_transaction_satisfactions(
+    transaction_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """거래 하나에 대해 시점별(1일/7일/30일)로 제출된 만족도 결과 비교 조회.
+
+    day_type만으로는 프론트가 어느 시점 응답인지 구분하기 어려워서 만든 조회 전용 엔드포인트.
+    (예: "7일 후 5점 -> 30일 후 3점" 같은 결과 페이지 비교 표시용)
+    """
+    _get_owned_transaction(db, user, transaction_id)  # 소유권 확인
+    records = db.query(Satisfaction).filter(Satisfaction.transaction_id == transaction_id).all()
+    order = {name: i for i, name in enumerate(DAY_TYPES)}
+    records.sort(key=lambda s: order.get(s.day_type, 99))
+    return records
 
 
 @router.put("/{transaction_id}", response_model=MessageResponse)

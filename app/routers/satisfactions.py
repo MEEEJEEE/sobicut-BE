@@ -22,7 +22,7 @@ def create_satisfaction(
     db: Session = Depends(get_db),
 ):
     if body.day_type not in DAY_TYPES:
-        raise HTTPException(status_code=422, detail="day_type은 '7일' 또는 '30일'이어야 합니다.")
+        raise HTTPException(status_code=422, detail="day_type은 '1일', '7일', '30일' 중 하나여야 합니다.")
 
     tx = (
         db.query(Transaction)
@@ -52,7 +52,9 @@ def create_satisfaction(
     level_service.add_exp(db, user, level_service.EXP_SATISFACTION)
     db.commit()
     db.refresh(record)
-    return SatisfactionCreateResponse(id=record.id, message="만족도 등록 완료")
+    return SatisfactionCreateResponse(
+        id=record.id, transaction_id=record.transaction_id, day_type=record.day_type, message="만족도 등록 완료"
+    )
 
 
 @router.get("/pending", response_model=list[PendingSatisfactionOut])

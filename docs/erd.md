@@ -57,7 +57,7 @@ User → Transaction → Emotion → Analysis
 ### Satisfaction
 - id (PK)
 - transaction_id (FK)
-- day_type → `"7일"` | `"30일"`
+- day_type → `"1일"` | `"7일"` | `"30일"`
 - score → 1~5 (1: 매우 후회, 5: 매우 만족)
 - submitted_at
 

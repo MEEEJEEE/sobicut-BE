@@ -338,7 +338,7 @@ Request:
 ## 6. Satisfaction
 
 ### POST /satisfactions
-만족도 등록 (5만원 이상 고가 소비, 7일/30일 후 2회 입력)
+만족도 등록 (5만원 이상 고가 소비, 1일/7일/30일 후 3회 입력)
 
 Request:
 ```json
@@ -349,13 +349,16 @@ Request:
 }
 ```
 
-> `day_type`: `"7일"` | `"30일"`
+> `day_type`: `"1일"` | `"7일"` | `"30일"` — 후회도(regret_score) 계산 시
+> `q = 0.2*q_1일 + 0.3*q_7일 + 0.5*q_30일` 가중 평균에 쓰인다.
 > `score`: 1(매우 후회) ~ 5(매우 만족)
 
 Response:
 ```json
 {
   "id": 1,
+  "transaction_id": 1,
+  "day_type": "7일",
   "message": "만족도 등록 완료"
 }
 ```
@@ -375,6 +378,22 @@ Response:
     "day_type": "7일",
     "due_date": "2026-04-26"
   }
+]
+```
+
+---
+
+### GET /transactions/{id}/satisfactions
+거래 하나에 대해 시점별(1일/7일/30일)로 제출된 만족도 결과 비교 조회
+(결과 페이지에서 "7일 후 5점 → 30일 후 3점" 같은 비교 표시용).
+`transaction_id`만으로는 어느 시점 응답인지 구분이 안 돼서, 이 엔드포인트가
+해당 거래의 제출 완료된 기록만 day_type 순서(1일→7일→30일)로 반환한다.
+
+Response:
+```json
+[
+  { "day_type": "7일", "score": 5, "submitted_at": "2026-04-26T10:00:00" },
+  { "day_type": "30일", "score": 3, "submitted_at": "2026-05-19T10:00:00" }
 ]
 ```
 
@@ -685,9 +704,20 @@ Response:
       "transaction_date": "2026-04-15",
       "impulse_score": 88
     }
-  ]
+  ],
+  "peer_avg_impulse_score": 58,
+  "week_over_week": {
+    "this_week": 65,
+    "last_week": 58,
+    "diff": 7
+  }
 }
 ```
+
+> `peer_avg_impulse_score`: 같은 그룹(거주형태+소득구간) 사용자들의 이번 달 평균 충동 점수.
+> 비교 대상 또래가 없으면 `null`.
+> `week_over_week`: 오늘 기준 최근 7일 vs 그 이전 7일의 평균 충동 점수. 해당 기간에
+> 지출 거래가 없으면 `this_week`/`last_week`가 `null`이고, 둘 중 하나라도 `null`이면 `diff`도 `null`.
 
 ---
 
@@ -878,9 +908,19 @@ Response:
   "budget": 1000000,
   "predicted_remaining": 20000,
   "is_over_budget": false,
-  "confidence": "medium"
+  "confidence": "medium",
+  "history": [
+    { "year": 2026, "month": 4, "spent": 650000 },
+    { "year": 2026, "month": 5, "spent": 810000 },
+    { "year": 2026, "month": 6, "spent": 700000 },
+    { "year": 2026, "month": 7, "spent": 890000 }
+  ],
+  "monthly_average": 762500
 }
 ```
+
+> `history`: 조회 월을 제외한 과거 4개월 실제 지출액, 오래된 순 (막대 차트용).
+> `monthly_average`: `history` 4개월의 평균 지출액.
 
 ---
 
