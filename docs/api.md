@@ -365,6 +365,37 @@ Response:
 
 ---
 
+### GET /satisfactions?year=&month=
+지정 월(생략 시 이번 달)에 **제출된**(`submitted_at` 기준) 만족도를 거래 단위로
+묶어서 일괄 조회. 결과 페이지에서 거래마다 `GET /transactions/{id}/satisfactions`를
+반복 호출하지 않도록 만든 목록 API. 거래일(`transaction_date`) 기준이 아니라
+"이번 달에 받은 응답" 기준이라, 지난달에 산 물건의 30일차 응답이 이번 달에 들어왔으면
+이번 달 목록에 잡힌다.
+
+Query Parameters:
+- `year` (int, optional)
+- `month` (int, optional)
+
+Response:
+```json
+[
+  {
+    "transaction_id": 5,
+    "merchant": "무신사",
+    "amount": 89000,
+    "transaction_date": "2026-06-01",
+    "satisfactions": [
+      { "day_type": "7일", "score": 5, "submitted_at": "2026-08-26T10:00:00" },
+      { "day_type": "30일", "score": 3, "submitted_at": "2026-08-31T09:00:00" }
+    ]
+  }
+]
+```
+
+> `transaction_date` 최신순 정렬. 각 거래의 `satisfactions`는 day_type 순서(1일→7일→30일).
+
+---
+
 ### GET /satisfactions/pending
 만족도 미입력 건 조회 (팝업 트리거용)
 
