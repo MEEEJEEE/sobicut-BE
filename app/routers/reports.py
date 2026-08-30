@@ -13,7 +13,9 @@ from app.services import wallet as wallet_service
 from app.services.impulse import (
     WEIGHTS,
     behavior_breakdown,
+    peer_avg_impulse_score,
     transaction_impulse_score,
+    weekly_impulse_comparison,
 )
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -118,6 +120,8 @@ def get_impulse(
         "breakdown": breakdown,
         "emotion_breakdown": emotion_breakdown,
         "top_impulse_transactions": scored[:5],
+        "peer_avg_impulse_score": peer_avg_impulse_score(db, user, year, month),
+        "week_over_week": weekly_impulse_comparison(db, user),
     }
 
 

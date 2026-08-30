@@ -118,6 +118,65 @@ def _peer_avg_usage_rate(db: Session, user: User, year: int, month: int) -> floa
     return sum(rates) / len(rates) if rates else None
 
 
+def peer_avg_impulse_score(db: Session, user: User, year: int, month: int) -> int | None:
+    """같은 그룹(거주형태+소득구간) 사용자들의 이번 달 평균 충동 점수"""
+    peers = (
+        db.query(User)
+        .filter(
+            User.residence_type == user.residence_type,
+            User.income_level == user.income_level,
+            User.id != user.id,
+            User.deleted_at.is_(None),
+        )
+        .all()
+    )
+    scores = []
+    for p in peers:
+        txs = (
+            db.query(Transaction)
+            .filter(
+                Transaction.user_id == p.id,
+                Transaction.type == "expense",
+                func.extract("year", Transaction.transaction_date) == year,
+                func.extract("month", Transaction.transaction_date) == month,
+            )
+            .all()
+        )
+        if txs:
+            scores.append(sum(transaction_impulse_score(db, tx, p) for tx in txs) / len(txs))
+    return round(sum(scores) / len(scores)) if scores else None
+
+
+def weekly_impulse_comparison(db: Session, user: User) -> dict:
+    """이번 주 vs 지난주 평균 충동 점수 (오늘 기준 최근 7일 롤링 윈도우)"""
+
+    def _avg_for_range(start: date, end: date) -> int | None:
+        txs = (
+            db.query(Transaction)
+            .filter(
+                Transaction.user_id == user.id,
+                Transaction.type == "expense",
+                Transaction.transaction_date >= start,
+                Transaction.transaction_date <= end,
+            )
+            .all()
+        )
+        if not txs:
+            return None
+        return round(sum(transaction_impulse_score(db, tx, user) for tx in txs) / len(txs))
+
+    today = date.today()
+    this_week_start = today - timedelta(days=6)
+    last_week_end = this_week_start - timedelta(days=1)
+    last_week_start = last_week_end - timedelta(days=6)
+
+    this_week = _avg_for_range(this_week_start, today)
+    last_week = _avg_for_range(last_week_start, last_week_end)
+    diff = (this_week - last_week) if (this_week is not None and last_week is not None) else None
+
+    return {"this_week": this_week, "last_week": last_week, "diff": diff}
+
+
 def monthly_spent(db: Session, user_id: int, year: int, month: int) -> int:
     total = (
         db.query(func.coalesce(func.sum(Transaction.amount), 0))

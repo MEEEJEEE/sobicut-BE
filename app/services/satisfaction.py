@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models import Transaction
 
-DAY_TYPES = {"7일": 7, "30일": 30}
+DAY_TYPES = {"1일": 1, "7일": 7, "30일": 30}
 
 
 def due_satisfaction_targets(
