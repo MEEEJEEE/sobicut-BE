@@ -32,3 +32,13 @@ class SatisfactionRecordOut(BaseModel):
     day_type: str
     score: int
     submitted_at: datetime
+
+
+class TransactionSatisfactionsOut(BaseModel):
+    """거래 하나 + 그 거래에 제출된 만족도 목록 (월별 결과 페이지 일괄 조회용)"""
+
+    transaction_id: int
+    merchant: str | None
+    amount: int
+    transaction_date: date
+    satisfactions: list[SatisfactionRecordOut]

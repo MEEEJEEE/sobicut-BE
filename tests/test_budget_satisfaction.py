@@ -78,3 +78,35 @@ def test_transaction_satisfactions_comparison(client, auth_headers):
     assert res.status_code == 200
     records = res.json()
     assert [(r["day_type"], r["score"]) for r in records] == [("7일", 5), ("30일", 3)]
+
+
+def test_list_satisfactions_by_month(client, auth_headers):
+    """결과 페이지 일괄 조회: 이번 달 제출된 만족도를 거래 단위로 묶어서 반환"""
+    from datetime import date
+
+    tx1 = _create_high_price_tx(client, auth_headers, tx_date="2026-06-01")
+    tx2 = _create_high_price_tx(client, auth_headers, tx_date="2026-06-10")
+
+    client.post("/satisfactions", json={"transaction_id": tx1, "day_type": "7일", "score": 5}, headers=auth_headers)
+    client.post("/satisfactions", json={"transaction_id": tx1, "day_type": "30일", "score": 3}, headers=auth_headers)
+    client.post("/satisfactions", json={"transaction_id": tx2, "day_type": "1일", "score": 4}, headers=auth_headers)
+
+    today = date.today()
+    res = client.get(f"/satisfactions?year={today.year}&month={today.month}", headers=auth_headers)
+    assert res.status_code == 200
+    data = res.json()
+    by_tx = {d["transaction_id"]: d for d in data}
+
+    assert set(by_tx.keys()) == {tx1, tx2}
+    assert [(s["day_type"], s["score"]) for s in by_tx[tx1]["satisfactions"]] == [("7일", 5), ("30일", 3)]
+    assert [(s["day_type"], s["score"]) for s in by_tx[tx2]["satisfactions"]] == [("1일", 4)]
+    assert by_tx[tx1]["merchant"] == "무신사"
+
+
+def test_list_satisfactions_empty_for_other_month(client, auth_headers):
+    tx_id = _create_high_price_tx(client, auth_headers, tx_date="2026-06-01")
+    client.post("/satisfactions", json={"transaction_id": tx_id, "day_type": "7일", "score": 5}, headers=auth_headers)
+
+    res = client.get("/satisfactions?year=2020&month=1", headers=auth_headers)
+    assert res.status_code == 200
+    assert res.json() == []

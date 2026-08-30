@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import extract
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
@@ -8,11 +11,14 @@ from app.schemas.satisfaction import (
     PendingSatisfactionOut,
     SatisfactionCreate,
     SatisfactionCreateResponse,
+    SatisfactionRecordOut,
+    TransactionSatisfactionsOut,
 )
 from app.services import level as level_service
 from app.services.satisfaction import DAY_TYPES, due_satisfaction_targets
 
 router = APIRouter(prefix="/satisfactions", tags=["Satisfaction"])
+_DAY_TYPE_ORDER = {name: i for i, name in enumerate(DAY_TYPES)}
 
 
 @router.post("", response_model=SatisfactionCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -55,6 +61,56 @@ def create_satisfaction(
     return SatisfactionCreateResponse(
         id=record.id, transaction_id=record.transaction_id, day_type=record.day_type, message="만족도 등록 완료"
     )
+
+
+@router.get("", response_model=list[TransactionSatisfactionsOut])
+def list_satisfactions(
+    year: int | None = Query(None),
+    month: int | None = Query(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """이번 달(또는 지정 월)에 제출된 만족도 결과를 거래 단위로 묶어서 일괄 조회.
+
+    거래마다 GET /transactions/{id}/satisfactions를 반복 호출하지 않도록,
+    결과 페이지에서 한 번에 쓰는 목록 API. year/month는 만족도 제출 시각(submitted_at)
+    기준으로 필터링한다 (거래일 기준 아님 — "이번 달에 받은 응답").
+    """
+    today = date.today()
+    year = year or today.year
+    month = month or today.month
+
+    records = (
+        db.query(Satisfaction)
+        .join(Transaction, Transaction.id == Satisfaction.transaction_id)
+        .filter(
+            Transaction.user_id == user.id,
+            extract("year", Satisfaction.submitted_at) == year,
+            extract("month", Satisfaction.submitted_at) == month,
+        )
+        .all()
+    )
+
+    by_tx: dict[int, list[Satisfaction]] = {}
+    for r in records:
+        by_tx.setdefault(r.transaction_id, []).append(r)
+
+    result = []
+    for tx_id, sats in by_tx.items():
+        sats.sort(key=lambda s: _DAY_TYPE_ORDER.get(s.day_type, 99))
+        tx = sats[0].transaction
+        result.append(
+            TransactionSatisfactionsOut(
+                transaction_id=tx_id,
+                merchant=tx.merchant,
+                amount=tx.amount,
+                transaction_date=tx.transaction_date,
+                satisfactions=[SatisfactionRecordOut.model_validate(s, from_attributes=True) for s in sats],
+            )
+        )
+
+    result.sort(key=lambda r: r.transaction_date, reverse=True)
+    return result
 
 
 @router.get("/pending", response_model=list[PendingSatisfactionOut])
