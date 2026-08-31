@@ -87,6 +87,22 @@ def unsubscribe(
     return MessageResponse(message="구독 해제 완료")
 
 
+@router.get("/subscriptions", response_model=list[str])
+def get_active_subscriptions(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """현재 로그인한 유저가 활성 구독 중인 notification_type 목록.
+
+    환경설정 페이지의 알림 종류별 토글 상태를 서버 값과 동기화하는 용도.
+    같은 종류를 여러 기기(endpoint)에서 구독해도 중복 없이 한 번만 반환한다.
+    """
+    rows = (
+        db.query(PushSubscription.notification_type)
+        .filter(PushSubscription.user_id == user.id, PushSubscription.is_active.is_(True))
+        .distinct()
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
 @router.post("/test-push", response_model=MessageResponse)
 def test_push(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     has_subscription = (
