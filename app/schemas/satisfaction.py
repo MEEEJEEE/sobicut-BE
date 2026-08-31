@@ -20,6 +20,7 @@ class PendingSatisfactionOut(BaseModel):
     transaction_id: int
     merchant: str | None
     amount: int
+    category: str
     day_type: str
     due_date: date
 
@@ -40,5 +41,6 @@ class TransactionSatisfactionsOut(BaseModel):
     transaction_id: int
     merchant: str | None
     amount: int
+    category: str
     transaction_date: date
     satisfactions: list[SatisfactionRecordOut]

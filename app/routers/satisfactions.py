@@ -104,6 +104,7 @@ def list_satisfactions(
                 transaction_id=tx_id,
                 merchant=tx.merchant,
                 amount=tx.amount,
+                category=tx.category,
                 transaction_date=tx.transaction_date,
                 satisfactions=[SatisfactionRecordOut.model_validate(s, from_attributes=True) for s in sats],
             )
@@ -124,6 +125,7 @@ def pending_satisfactions(
             transaction_id=tx.id,
             merchant=tx.merchant,
             amount=tx.amount,
+            category=tx.category,
             day_type=day_type,
             due_date=due,
         )
