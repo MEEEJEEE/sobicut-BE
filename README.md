@@ -215,11 +215,13 @@ MBTI처럼 소비 유형 제공
 
 ---
 
-### 🔔 알림
+### 🔔 알림 (4종, 종류별 개별 on/off)
 
-* 예산 초과 / 충동 경고 알림 (인앱 + 웹 푸시)
-* 고가 소비 만족도 조사 알림 (7일/30일 후 자동 배치, 매일 09:00 KST)
-* 웹 푸시 구독/해제 (VAPID, 알림 종류별 개별 on/off)
+* 충동지수·예산초과 알림 — 거래 등록 시 실시간 체크 (인앱 + 웹 푸시)
+* 히트맵 알림 — 이번 달 소비 최다 요일/시간대 진입 시 자동 발송 (매일 06/11/14/19/23시 KST)
+* 가계부 기록 도우미 — 오늘 지출/수입 기록이 없으면 매일 22:00(KST) 알림
+* 만족도 조사 알림 — 고가 소비(5만원↑) 후 1일/7일/30일째 자동 배치, 매일 21:00(KST)
+* 웹 푸시 구독/해제 (VAPID)
 
 ---
 
@@ -269,12 +271,13 @@ app/
 ├── db/              # 세션, Base, 시드 데이터(구매 결정 심리특성 5종)
 ├── models/          # SQLAlchemy 모델 (ERD v2)
 ├── schemas/         # Pydantic 요청/응답 스키마
-├── services/        # 충동 점수·지갑 온도·BPTI·리포트·레벨·카드문자파싱·웹푸시·만족도배치 로직
+├── services/        # 충동 점수·지갑 온도·BPTI·리포트·레벨·카드문자파싱·카테고리매칭·
+│                    # 웹푸시·만족도배치·히트맵배치·기록도우미배치 로직
 │   └── weights.json # 충동 점수 가중치 (PCA/설문 산출값으로 교체 예정)
 └── routers/         # API 라우터 (auth/users/transactions/emotions/budget/satisfactions/notifications/reports)
 alembic/             # DB 마이그레이션
 scripts/             # VAPID 키 생성 등 1회성 스크립트
-tests/               # pytest 테스트 (47건)
+tests/               # pytest 테스트 (65건)
 ```
 
 > 충동 점수 가중치는 `app/services/weights.json`에 분리되어 있어,

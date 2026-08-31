@@ -141,13 +141,16 @@ Response:
   "merchant": "혜화역 카페",
   "transaction_date": "2026-08-22",
   "transaction_time": "14:32",
-  "card_company": "신한카드"
+  "card_company": "신한카드",
+  "category": "식비"
 }
 ```
 
 > 파싱 결과는 거래 등록(`POST /transactions`)을 대신하지 않는다. 프론트에서 파싱 결과를
 > 폼에 채운 뒤 사용자가 확인/수정 후 별도로 `POST /transactions`를 호출해야 한다.
 > 지원하지 않는 카드사이거나 필수 항목(금액/날짜/시간/가맹점)을 추출하지 못하면 `422`를 반환한다.
+> `category`는 가맹점명 기반 규칙 매칭(LLM 아님)으로 추정한 값이며, 매칭 실패 시 `null` —
+> 이 경우 프론트에서 사용자가 직접 카테고리를 선택하도록 안내해야 한다.
 
 ---
 
@@ -439,13 +442,19 @@ Response:
 
 Query Parameters:
 - `type` (string, optional): 알림 종류 필터
-  - `budget_weekly`: 주간 예산 초과 ✅ 구현됨 (거래 등록 시 체크, 소비컷알림 구독자에게 웹 푸시도 함께 발송)
+  - `budget_weekly`: 주간 예산 초과 ✅ 구현됨 (거래 등록 시 체크, 충동지수예산초과알림 구독자에게 웹 푸시도 함께 발송)
   - `budget_monthly`: 월간 예산 초과 ✅ 구현됨 (위와 동일)
   - `impulse_warning`: 충동 소비 경고 ✅ 구현됨 (위와 동일)
-  - `heatmap_time`: 시간대 소비 패턴 경고 ⛔️ 미구현 (트리거 조건 미정)
-  - `heatmap_day`: 요일 소비 패턴 경고 ⛔️ 미구현 (트리거 조건 미정)
+  - `heatmap_time` / `heatmap_day`: 시간대·요일 소비 패턴 경고 ✅ 구현됨 — 이번 달
+    히트맵에서 소비가 가장 잦은 요일/시간대(`GET /reports/heatmap`의 `peak`)에
+    실제로 진입하는 시점(매일 06/11/14/19/23시 KST, 시간대 경계마다 체크)에
+    인앱 알림 + 히트맵알림 구독자에게 웹 푸시 발송. 하루 1건으로 중복 방지.
+  - `no_transaction_reminder`: 가계부 기록 도우미 ✅ 구현됨 — 매일 22:00(KST)에
+    그날 등록된 거래(수입/지출 무관)가 하나도 없으면 "오늘의 소비, 아직
+    기록하지 않았어요. 지금 한 번 기록해 볼까요?" 알림 + 가계부기록도우미
+    구독자에게 웹 푸시 발송.
   - `satisfaction_request`: 만족도 입력 요청 ✅ 구현됨 — 고가 소비(5만원 이상) 후
-    정확히 7일/30일째 되는 날 매일 09:00(KST) 배치로 인앱 알림 + 만족도조사알림
+    정확히 1일/7일/30일째 되는 날 매일 21:00(KST) 배치로 인앱 알림 + 만족도조사알림
     구독자에게 웹 푸시 발송. `satisfaction_notification_logs` 테이블로 중복 발송 방지.
     (참고: `GET /satisfactions/pending`은 이 배치와 별개로, 마감일이 지났고 아직
     미제출인 건을 그때그때 계산해서 보여주는 용도라 배치 발송 여부와 무관하게 계속 조회 가능)
@@ -524,11 +533,12 @@ Request:
     "p256dh": "...",
     "auth": "..."
   },
-  "notification_type": "소비컷알림"
+  "notification_type": "충동지수예산초과알림"
 }
 ```
 
-> `notification_type`: `"소비컷알림"` | `"만족도조사알림"`
+> `notification_type`: `"히트맵알림"` | `"가계부기록도우미"` | `"만족도조사알림"` | `"충동지수예산초과알림"`
+> — 4종 각각 독립적으로 구독/해제 가능 (온오프 토글용).
 
 Response:
 ```json
@@ -546,7 +556,7 @@ Request:
 ```json
 {
   "endpoint": "https://fcm.googleapis.com/fcm/send/xxxxx",
-  "notification_type": "소비컷알림"
+  "notification_type": "충동지수예산초과알림"
 }
 ```
 

@@ -19,7 +19,7 @@ class PushSubscription(Base):
     endpoint: Mapped[str] = mapped_column(String(500), nullable=False)
     p256dh: Mapped[str] = mapped_column(String(255), nullable=False)
     auth: Mapped[str] = mapped_column(String(255), nullable=False)
-    notification_type: Mapped[str] = mapped_column(String(30), nullable=False)  # 소비컷알림 | 만족도조사알림
+    notification_type: Mapped[str] = mapped_column(String(30), nullable=False)  # 충동지수예산초과알림 | 만족도조사알림
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 

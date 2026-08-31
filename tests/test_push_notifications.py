@@ -7,7 +7,7 @@ from app.services import web_push as web_push_service
 SUBSCRIBE_BODY = {
     "endpoint": "https://fcm.googleapis.com/fcm/send/fake-endpoint-id",
     "keys": {"p256dh": "fake-p256dh-key", "auth": "fake-auth-secret"},
-    "notification_type": "소비컷알림",
+    "notification_type": "충동지수예산초과알림",
 }
 
 
@@ -44,7 +44,7 @@ def test_subscribe_unsubscribe_flow(client, auth_headers):
 
     res = client.post(
         "/notifications/unsubscribe",
-        json={"endpoint": SUBSCRIBE_BODY["endpoint"], "notification_type": "소비컷알림"},
+        json={"endpoint": SUBSCRIBE_BODY["endpoint"], "notification_type": "충동지수예산초과알림"},
         headers=auth_headers,
     )
     assert res.status_code == 200
@@ -52,7 +52,7 @@ def test_subscribe_unsubscribe_flow(client, auth_headers):
     # 존재하지 않는 구독 해제는 404
     res = client.post(
         "/notifications/unsubscribe",
-        json={"endpoint": "https://never-subscribed.example.com", "notification_type": "소비컷알림"},
+        json={"endpoint": "https://never-subscribed.example.com", "notification_type": "충동지수예산초과알림"},
         headers=auth_headers,
     )
     assert res.status_code == 404

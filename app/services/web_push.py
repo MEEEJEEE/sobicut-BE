@@ -39,6 +39,15 @@ def send_push(subscription: PushSubscription, title: str, body: str) -> bool:
             subscription.user_id, subscription.notification_type, e,
         )
         return False
+    except Exception:
+        # 구독 정보(p256dh/auth)가 손상된 값이면 pywebpush가 WebPushException이 아니라
+        # binascii.Error 등을 raise한다 — 이거 하나 때문에 배치 전체(다른 유저 발송분까지)가
+        # 죽으면 안 되므로 여기서 넓게 잡는다.
+        logger.exception(
+            "웹 푸시 발송 중 예상 못한 오류 user_id=%s notification_type=%s",
+            subscription.user_id, subscription.notification_type,
+        )
+        return False
 
 
 def notify_active_subscribers(db: Session, user_id: int, notification_type: str, title: str, body: str) -> None:
