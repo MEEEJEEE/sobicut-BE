@@ -14,6 +14,8 @@ from app.services.impulse import (
     WEIGHTS,
     behavior_breakdown,
     peer_avg_impulse_score,
+    post_purchase_breakdown,
+    risk_level,
     transaction_impulse_score,
     weekly_impulse_comparison,
 )
@@ -105,7 +107,8 @@ def get_impulse(
                 "merchant": tx.merchant,
                 "amount": tx.amount,
                 "transaction_date": tx.transaction_date.isoformat(),
-                "impulse_score": transaction_impulse_score(db, tx, user),
+                "impulse_score": (score := transaction_impulse_score(db, tx, user)),
+                "risk_level": risk_level(score),
             }
             for tx in txs
         ),
@@ -115,14 +118,28 @@ def get_impulse(
 
     return {
         "impulse_score": impulse_score,
-        "threshold": int(settings.IMPULSE_THRESHOLD * 100),
-        "is_warning": impulse_score >= settings.IMPULSE_THRESHOLD * 100,
+        "risk_level": risk_level(impulse_score),
+        "threshold": int(settings.IMPULSE_WARNING_THRESHOLD * 100),
+        "caution_threshold": int(settings.IMPULSE_CAUTION_THRESHOLD * 100),
+        "is_warning": impulse_score >= settings.IMPULSE_WARNING_THRESHOLD * 100,
         "breakdown": breakdown,
         "emotion_breakdown": emotion_breakdown,
         "top_impulse_transactions": scored[:5],
         "peer_avg_impulse_score": peer_avg_impulse_score(db, user, year, month),
         "week_over_week": weekly_impulse_comparison(db, user),
+        "post_purchase": _month_post_purchase_avg(db, txs),
     }
+
+
+def _month_post_purchase_avg(db: Session, txs: list[Transaction]) -> dict:
+    """결제 후 평가(구매후후회/지속적만족) 월 평균 — 참고용, 충동 점수엔 미반영."""
+    if not txs:
+        return {"regret_score": 0.0, "sustained_satisfaction": 0.0}
+    acc = {"regret_score": 0.0, "sustained_satisfaction": 0.0}
+    for tx in txs:
+        for k, v in post_purchase_breakdown(db, tx).items():
+            acc[k] += v
+    return {k: round(v / len(txs), 2) for k, v in acc.items()}
 
 
 @router.get("/wallet-temperature")

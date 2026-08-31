@@ -82,7 +82,7 @@ def test_reports(client, auth_headers):
     assert bpti["type"] == "FIRE"  # 주력 태그: 스트레스
 
     impulse = client.get("/reports/impulse?year=2026&month=7", headers=auth_headers).json()
-    assert impulse["threshold"] == 75
+    assert impulse["threshold"] == 67
     assert impulse["breakdown"]["time_abnormal"] == 1.0  # 새벽 2:30 소비
     assert len(impulse["top_impulse_transactions"]) == 1
 

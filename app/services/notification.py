@@ -72,9 +72,9 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
                     db, user.id, PUSH_NOTIFICATION_TYPE, title, message, notification_type="budget_weekly"
                 )
 
-    # 충동 소비 경고
+    # 충동 소비 경고 (충동 위험 지수 67점 이상)
     score = transaction_impulse_score(db, tx, user)
-    if score >= settings.IMPULSE_THRESHOLD * 100:
+    if score >= settings.IMPULSE_WARNING_THRESHOLD * 100:
         title = "충동 소비 경고 ✂️"
         message = f"방금 소비의 충동 점수가 {score}점이에요. 잠시 멈추고 다시 생각해봐요!"
         db.add(Notification(user_id=user.id, type="impulse_warning", title=title, message=message, transaction_id=tx.id))
@@ -82,6 +82,10 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
             db, user.id, PUSH_NOTIFICATION_TYPE, title, message,
             notification_type="impulse_warning", transaction_id=tx.id,
         )
-    elif score < level_service.LOW_IMPULSE_THRESHOLD:
-        # 신중한 소비 보너스 — 좋은 소비 습관이 exp/레벨업에 직접 반영되도록
+    elif score < level_service.LOW_IMPULSE_THRESHOLD and not tx.low_impulse_bonus_granted:
+        # 신중한 소비 보너스 — 좋은 소비 습관이 exp/레벨업에 직접 반영되도록.
+        # 감정 태그는 거래 등록 이후 별도 호출로 붙기 때문에(생성 시점엔 항상 비어있음),
+        # 실제로는 태깅 이후 재판정(tag_emotions)에서 주로 지급되고 여기선 태그 없이도
+        # 낮은 점수가 나오는 경우(예산 미설정 등)만 잡는다.
         level_service.add_exp(db, user, level_service.EXP_LOW_IMPULSE_BONUS)
+        tx.low_impulse_bonus_granted = True
