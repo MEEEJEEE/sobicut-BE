@@ -58,6 +58,45 @@ def test_subscribe_unsubscribe_flow(client, auth_headers):
     assert res.status_code == 404
 
 
+def test_get_active_subscriptions(client, auth_headers):
+    # 처음엔 구독 없음
+    res = client.get("/notifications/subscriptions", headers=auth_headers)
+    assert res.status_code == 200
+    assert res.json() == []
+
+    client.post("/notifications/subscribe", json=SUBSCRIBE_BODY, headers=auth_headers)
+    client.post(
+        "/notifications/subscribe",
+        json={**SUBSCRIBE_BODY, "notification_type": "만족도조사알림"},
+        headers=auth_headers,
+    )
+
+    res = client.get("/notifications/subscriptions", headers=auth_headers)
+    assert set(res.json()) == {"충동지수예산초과알림", "만족도조사알림"}
+
+    # 해제하면 목록에서 빠짐
+    client.post(
+        "/notifications/unsubscribe",
+        json={"endpoint": SUBSCRIBE_BODY["endpoint"], "notification_type": "충동지수예산초과알림"},
+        headers=auth_headers,
+    )
+    res = client.get("/notifications/subscriptions", headers=auth_headers)
+    assert res.json() == ["만족도조사알림"]
+
+
+def test_get_active_subscriptions_deduplicated_across_devices(client, auth_headers):
+    """같은 종류를 여러 기기(endpoint)에서 구독해도 중복 없이 한 번만 나와야 한다."""
+    client.post("/notifications/subscribe", json=SUBSCRIBE_BODY, headers=auth_headers)
+    client.post(
+        "/notifications/subscribe",
+        json={**SUBSCRIBE_BODY, "endpoint": "https://fcm.googleapis.com/fcm/send/second-device"},
+        headers=auth_headers,
+    )
+
+    res = client.get("/notifications/subscriptions", headers=auth_headers)
+    assert res.json() == ["충동지수예산초과알림"]
+
+
 def test_test_push_without_subscription(client, auth_headers):
     res = client.post("/notifications/test-push", headers=auth_headers)
     assert res.status_code == 404
