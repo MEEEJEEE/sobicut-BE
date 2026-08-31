@@ -44,6 +44,7 @@ def test_batch_sends_notification_when_due_today(client, auth_headers, monkeypat
         noti = db.query(Notification).filter(Notification.type == "satisfaction_request").first()
         assert noti is not None
         assert "7일" in noti.title
+        assert noti.transaction_id == tx_id  # 클릭 시 어느 거래인지 알아야 결과 페이지로 이동 가능
 
         log = (
             db.query(SatisfactionNotificationLog)
@@ -53,6 +54,16 @@ def test_batch_sends_notification_when_due_today(client, auth_headers, monkeypat
         assert log is not None
     finally:
         db.close()
+
+    assert len(calls) == 1
+    payload = json.loads(calls[0]["data"])
+    assert payload["type"] == "satisfaction_request"
+    assert payload["transaction_id"] == tx_id
+
+    # API 응답(GET /notifications)에도 transaction_id가 노출돼야 프론트가 클릭 라우팅에 쓸 수 있다
+    notifications = client.get("/notifications", headers=auth_headers).json()
+    satisfaction_notifs = [n for n in notifications if n["type"] == "satisfaction_request"]
+    assert satisfaction_notifs and satisfaction_notifs[0]["transaction_id"] == tx_id
 
     assert len(calls) == 1
     assert json.loads(calls[0]["data"])["title"] == noti.title

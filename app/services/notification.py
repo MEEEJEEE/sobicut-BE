@@ -43,7 +43,9 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
             ):
                 title, message = "월간 예산 초과", "이번 달 예산을 초과했습니다."
                 db.add(Notification(user_id=user.id, type="budget_monthly", title=title, message=message))
-                notify_active_subscribers(db, user.id, PUSH_NOTIFICATION_TYPE, title, message)
+                notify_active_subscribers(
+                    db, user.id, PUSH_NOTIFICATION_TYPE, title, message, notification_type="budget_monthly"
+                )
 
         # 주간 예산 초과 (해당 주차 예산 기준)
         week = get_week_of_month(d)
@@ -66,15 +68,20 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
             ):
                 title, message = "주간 예산 초과", "이번 주 예산을 초과했습니다."
                 db.add(Notification(user_id=user.id, type="budget_weekly", title=title, message=message))
-                notify_active_subscribers(db, user.id, PUSH_NOTIFICATION_TYPE, title, message)
+                notify_active_subscribers(
+                    db, user.id, PUSH_NOTIFICATION_TYPE, title, message, notification_type="budget_weekly"
+                )
 
     # 충동 소비 경고
     score = transaction_impulse_score(db, tx, user)
     if score >= settings.IMPULSE_THRESHOLD * 100:
         title = "충동 소비 경고 ✂️"
         message = f"방금 소비의 충동 점수가 {score}점이에요. 잠시 멈추고 다시 생각해봐요!"
-        db.add(Notification(user_id=user.id, type="impulse_warning", title=title, message=message))
-        notify_active_subscribers(db, user.id, PUSH_NOTIFICATION_TYPE, title, message)
+        db.add(Notification(user_id=user.id, type="impulse_warning", title=title, message=message, transaction_id=tx.id))
+        notify_active_subscribers(
+            db, user.id, PUSH_NOTIFICATION_TYPE, title, message,
+            notification_type="impulse_warning", transaction_id=tx.id,
+        )
     elif score < level_service.LOW_IMPULSE_THRESHOLD:
         # 신중한 소비 보너스 — 좋은 소비 습관이 exp/레벨업에 직접 반영되도록
         level_service.add_exp(db, user, level_service.EXP_LOW_IMPULSE_BONUS)

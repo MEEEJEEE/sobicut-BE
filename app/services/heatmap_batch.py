@@ -50,7 +50,7 @@ def process_heatmap_alerts(db: Session) -> int:
         title = peak["notification_label"]
         message = f"{peak['day']}요일 {peak['time_slot']} 시간대는 평소 소비가 가장 잦은 때예요. 잠깐 멈춰볼까요?"
         db.add(Notification(user_id=user.id, type=notif_type, title=title, message=message))
-        notify_active_subscribers(db, user.id, PUSH_NOTIFICATION_TYPE, title, message)
+        notify_active_subscribers(db, user.id, PUSH_NOTIFICATION_TYPE, title, message, notification_type=notif_type)
         sent += 1
 
     db.commit()

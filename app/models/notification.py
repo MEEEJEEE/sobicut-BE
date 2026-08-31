@@ -17,6 +17,8 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String(100), nullable=False)
     message: Mapped[str] = mapped_column(String(255), nullable=False)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # 특정 거래에 대한 알림(예: impulse_warning, satisfaction_request)일 때만 값이 있음
+    transaction_id: Mapped[int | None] = mapped_column(ForeignKey("transactions.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
     user = relationship("User", back_populates="notifications")

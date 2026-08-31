@@ -11,6 +11,7 @@ class NotificationOut(BaseModel):
     title: str
     message: str
     is_read: bool
+    transaction_id: int | None = None
     created_at: datetime
 
 
