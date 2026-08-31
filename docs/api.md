@@ -468,18 +468,25 @@ Response:
     "title": "주간 예산 초과",
     "message": "이번 주 예산을 초과했습니다.",
     "is_read": false,
+    "transaction_id": null,
     "created_at": "2026-04-19T14:30:00"
   },
   {
     "id": 2,
-    "type": "heatmap_time",
-    "title": "야간 야망 컷 ✂️",
-    "message": "밤 11시, 지금이 가장 많이 쓰는 시간대예요!",
+    "type": "impulse_warning",
+    "title": "충동 소비 경고 ✂️",
+    "message": "방금 소비의 충동 점수가 88점이에요. 잠시 멈추고 다시 생각해봐요!",
     "is_read": false,
+    "transaction_id": 42,
     "created_at": "2026-04-19T23:05:00"
   }
 ]
 ```
+
+> `transaction_id`: 특정 거래에 대한 알림(`impulse_warning`, `satisfaction_request`)일 때만
+> 값이 있고, 그 외(`budget_weekly`/`budget_monthly`/`heatmap_time`/`heatmap_day`/
+> `no_transaction_reminder`)는 항상 `null`. 클릭 시 해당 거래 상세/결과 페이지로
+> 이동시키는 용도.
 
 ---
 
@@ -538,7 +545,27 @@ Request:
 ```
 
 > `notification_type`: `"히트맵알림"` | `"가계부기록도우미"` | `"만족도조사알림"` | `"충동지수예산초과알림"`
-> — 4종 각각 독립적으로 구독/해제 가능 (온오프 토글용).
+> — 4종 각각 독립적으로 구독/해제 가능 (온오프 토글용). 이 값은 구독 카테고리이며,
+> 실제 웹 푸시로 브라우저에 도착하는 payload의 `type`(아래 참고)과는 다른 값이다 —
+> 예를 들어 `"충동지수예산초과알림"` 카테고리를 구독하면 그 안의 세부 타입인
+> `budget_weekly`/`budget_monthly`/`impulse_warning` 알림을 전부 받는다.
+
+**웹 푸시 payload 형식** (`pushManager`의 `push` 이벤트로 브라우저에 도착하는 데이터,
+서비스워커에서 `event.data.json()`으로 파싱):
+```json
+{
+  "title": "충동 소비 경고 ✂️",
+  "body": "방금 소비의 충동 점수가 88점이에요. 잠시 멈추고 다시 생각해봐요!",
+  "type": "impulse_warning",
+  "transaction_id": 42
+}
+```
+> `type`: `GET /notifications` 응답의 `type`과 동일한 값
+> (`budget_weekly`/`budget_monthly`/`impulse_warning`/`heatmap_time`/`heatmap_day`/
+> `no_transaction_reminder`/`satisfaction_request`). URL은 백엔드가 만들어 보내지 않으니
+> 이 `type`(+ 있으면 `transaction_id`)으로 프론트에서 클릭 시 이동할 라우트를 결정하면 된다.
+> `transaction_id`는 특정 거래에 대한 알림(`impulse_warning`, `satisfaction_request`)일
+> 때만 포함되고, 그 외에는 필드 자체가 없다.
 
 Response:
 ```json

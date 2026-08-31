@@ -40,9 +40,16 @@ def process_satisfaction_reminders(db: Session) -> int:
         title = _TITLES[day_type]
         message = f"{tx.merchant or '해당 소비'} {tx.amount:,}원, 만족도를 알려주세요."
 
-        db.add(Notification(user_id=tx.user_id, type="satisfaction_request", title=title, message=message))
+        db.add(
+            Notification(
+                user_id=tx.user_id, type="satisfaction_request", title=title, message=message, transaction_id=tx.id
+            )
+        )
         db.add(SatisfactionNotificationLog(transaction_id=tx.id, day_type=day_type))
-        notify_active_subscribers(db, tx.user_id, PUSH_NOTIFICATION_TYPE, title, message)
+        notify_active_subscribers(
+            db, tx.user_id, PUSH_NOTIFICATION_TYPE, title, message,
+            notification_type="satisfaction_request", transaction_id=tx.id,
+        )
         sent += 1
 
     db.commit()

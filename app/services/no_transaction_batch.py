@@ -48,7 +48,9 @@ def process_no_transaction_reminders(db: Session) -> int:
         title = "오늘의 소비, 아직 기록하지 않았어요"
         message = "지금 한 번 기록해 볼까요?"
         db.add(Notification(user_id=user.id, type=NOTIFICATION_TYPE, title=title, message=message))
-        notify_active_subscribers(db, user.id, PUSH_NOTIFICATION_TYPE, title, message)
+        notify_active_subscribers(
+            db, user.id, PUSH_NOTIFICATION_TYPE, title, message, notification_type=NOTIFICATION_TYPE
+        )
         sent += 1
 
     db.commit()

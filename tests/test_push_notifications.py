@@ -126,6 +126,56 @@ def test_budget_exceeded_transaction_triggers_push(client, auth_headers, monkeyp
     titles = {json.loads(c["data"])["title"] for c in calls}
     assert "주간 예산 초과" in titles
 
+    payloads = [json.loads(c["data"]) for c in calls]
+    budget_payload = next(p for p in payloads if p["title"] == "주간 예산 초과")
+    assert budget_payload["type"] == "budget_weekly"
+    assert "transaction_id" not in budget_payload  # 특정 거래 알림이 아니므로 없어야 함
+
+
+def test_impulse_warning_push_includes_transaction_id(client, auth_headers, monkeypatch):
+    """impulse_warning은 특정 거래에 대한 알림이므로 payload/응답에 transaction_id가 있어야 한다."""
+    calls = []
+    monkeypatch.setattr(web_push_service, "webpush", lambda **kwargs: calls.append(kwargs))
+    client.post("/notifications/subscribe", json=SUBSCRIBE_BODY, headers=auth_headers)
+
+    client.put(
+        "/budget",
+        json={
+            "monthly_budget": 100000, "weekly_budget": 25000,
+            "weekly_budgets": {"week_1": 25000, "week_2": 25000, "week_3": 25000, "week_4": 25000},
+        },
+        headers=auth_headers,
+    )
+    # 같은 주 같은 카테고리 반복 소비(repeat_consumption)까지 겹쳐야 충동 점수가
+    # 경고 임계치(75)를 넘는다 — 새벽 시간대 + 예산 대비 큰 금액만으로는 부족함.
+    for _ in range(2):
+        client.post(
+            "/transactions",
+            json={
+                "amount": 90000, "type": "expense", "category": "쇼핑/패션", "merchant": "쇼핑몰",
+                "transaction_date": "2026-08-25", "transaction_time": "03:00",
+            },
+            headers=auth_headers,
+        )
+    res = client.post(
+        "/transactions",
+        json={
+            "amount": 90000, "type": "expense", "category": "쇼핑/패션", "merchant": "쇼핑몰",
+            "transaction_date": "2026-08-25", "transaction_time": "03:00",
+        },
+        headers=auth_headers,
+    )
+    assert res.status_code == 201
+    tx_id = res.json()["id"]
+
+    payloads = [json.loads(c["data"]) for c in calls]
+    impulse_payload = next(p for p in payloads if p["type"] == "impulse_warning")
+    assert impulse_payload["transaction_id"] == tx_id
+
+    notifications = client.get("/notifications", headers=auth_headers).json()
+    impulse_notifs = [n for n in notifications if n["type"] == "impulse_warning"]
+    assert impulse_notifs and impulse_notifs[0]["transaction_id"] == tx_id
+
 
 def test_transaction_without_subscription_does_not_error(client, auth_headers):
     """구독이 없는 사용자는 push 시도 없이 거래 생성이 그대로 성공해야 한다."""
