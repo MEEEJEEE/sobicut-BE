@@ -66,7 +66,7 @@ def _wallet_summary(db: Session, user: User, year: int, month: int) -> dict:
         "my_temp": my_temp,
         "peer_avg_temp": peer_temp,
         "diff": my_temp - peer_temp,
-        "level": level["status"],
+        "level": level["label"],
         "emoji": level["emoji"],
         "message": level["message"],
     }

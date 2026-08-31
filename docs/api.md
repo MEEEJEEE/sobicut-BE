@@ -826,6 +826,11 @@ Response:
 }
 ```
 
+> `level`은 `temperature_levels[].status`가 아니라 `temperature_levels[].label` 값
+> (`"매우 안정"`/`"안정"`/`"보통"`/`"임계"`/`"초과"`/`"과열"`)이다. 소비율 80% 이상 구간에서
+> `label`과 `status`가 갈리므로("임계" vs "주의" 등) 프론트는 `label` 기준으로 매칭할 것.
+> (`/reports/scores`, `/reports/wallet-temperature/monthly`의 `level`도 동일)
+
 ---
 
 ### GET /reports/bpti
