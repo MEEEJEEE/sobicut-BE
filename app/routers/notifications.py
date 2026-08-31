@@ -16,7 +16,7 @@ from app.services.web_push import send_test_notification
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
-NOTIFICATION_SUBSCRIPTION_TYPES = {"소비컷알림", "만족도조사알림"}
+NOTIFICATION_SUBSCRIPTION_TYPES = {"히트맵알림", "가계부기록도우미", "만족도조사알림", "충동지수예산초과알림"}
 
 
 @router.get("/vapid-public-key", response_model=VapidPublicKeyResponse)

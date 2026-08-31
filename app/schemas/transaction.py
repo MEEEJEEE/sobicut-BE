@@ -53,3 +53,4 @@ class CardMessageParseResponse(BaseModel):
     transaction_date: date
     transaction_time: str  # "HH:MM" (초 단위 없이 스펙 형식 그대로 유지)
     card_company: str
+    category: str | None = None  # 규칙 기반 자동 매칭. 실패 시 null -> 프론트에서 수동 선택 유도

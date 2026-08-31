@@ -21,6 +21,7 @@ from app.schemas.transaction import (
 from app.services import level as level_service
 from app.services import notification as notification_service
 from app.services.card_parser import CardParseError, CardParser
+from app.services.category_matcher import guess_category
 from app.services.impulse import transaction_impulse_score
 from app.services.satisfaction import DAY_TYPES
 
@@ -72,9 +73,11 @@ def parse_card_message(
     user: User = Depends(get_current_user),
 ):
     try:
-        return CardParser().parse(body.message_text)
+        result = CardParser().parse(body.message_text)
     except CardParseError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    result["category"] = guess_category(result["merchant"])
+    return result
 
 
 @router.get("", response_model=list[TransactionOut])

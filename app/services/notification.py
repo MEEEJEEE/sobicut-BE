@@ -10,7 +10,7 @@ from app.services.common import get_week_of_month
 from app.services.impulse import monthly_spent, transaction_impulse_score
 from app.services.web_push import notify_active_subscribers
 
-PUSH_NOTIFICATION_TYPE = "소비컷알림"
+PUSH_NOTIFICATION_TYPE = "충동지수예산초과알림"
 
 
 def _exists_this_period(db: Session, user_id: int, ntype: str, since: date) -> bool:
