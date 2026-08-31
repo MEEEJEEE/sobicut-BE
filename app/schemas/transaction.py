@@ -11,6 +11,7 @@ class TransactionCreate(BaseModel):
     description: str | None = None
     transaction_date: date
     transaction_time: time
+    subjective_burden: int | None = Field(None, ge=1, le=5)  # 체감 경제적 부담(충동 점수 β2용)
 
 
 class TransactionCreateResponse(BaseModel):
@@ -35,12 +36,14 @@ class TransactionOut(BaseModel):
     description: str | None
     transaction_date: date
     transaction_time: time
+    subjective_burden: int | None = None
     emotion_tags: list[EmotionTagOut]
     created_at: datetime
 
 
 class TransactionDetailOut(TransactionOut):
     impulse_score: int = 0
+    risk_level: str = "낮음"  # "낮음" | "주의" | "경고" (충동 점수 구간)
 
 
 class CardMessageParseRequest(BaseModel):

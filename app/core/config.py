@@ -9,8 +9,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24시간
 
-    # 충동 소비 판단 임계값 (확률)
-    IMPULSE_THRESHOLD: float = 0.75
+    # 충동 위험 지수 3단계 임계값 (설문조사 기반 충동 점수 로직 재설정 문서 기준)
+    # 0~59 낮음 / 60~66 주의 / 67 이상 경고
+    IMPULSE_WARNING_THRESHOLD: float = 0.67
+    IMPULSE_CAUTION_THRESHOLD: float = 0.60
     # 고가 소비 기준 (만족도 조사 대상)
     HIGH_PRICE_THRESHOLD: int = 50000
 

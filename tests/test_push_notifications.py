@@ -172,10 +172,24 @@ def test_budget_exceeded_transaction_triggers_push(client, auth_headers, monkeyp
 
 
 def test_impulse_warning_push_includes_transaction_id(client, auth_headers, monkeypatch):
-    """impulse_warning은 특정 거래에 대한 알림이므로 payload/응답에 transaction_id가 있어야 한다."""
+    """impulse_warning은 특정 거래에 대한 알림이므로 payload/응답에 transaction_id가 있어야 한다.
+
+    새 충동 점수 공식(bias=0)에서 경고 임계치(67점)를 넘으려면 결제 전 변수
+    (이상시간대 0.14 + 금액부담 0.54 + 또래대비소비 0.42)를 전부 최대로 채워야 한다.
+    또래대비소비를 최대(1.0)로 만들려면 같은 그룹(거주형태+소득구간) 또래가 있고
+    이 유저의 지출이 또래보다 훨씬 많아야 한다 — 또래 지출이 0이면 표준편차가 0이 되어
+    분기상 바로 최댓값(1.0)으로 처리된다.
+    """
     calls = []
     monkeypatch.setattr(web_push_service, "webpush", lambda **kwargs: calls.append(kwargs))
     client.post("/notifications/subscribe", json=SUBSCRIBE_BODY, headers=auth_headers)
+
+    # 같은 그룹(자취/30-60) 또래 2명을 지출 없이 만들어서 또래대비소비를 최댓값으로 만든다
+    for i in range(2):
+        client.post("/auth/signup", json={
+            "email": f"peer_impulse_{i}@test.com", "password": "abcd1234", "nickname": f"peer{i}",
+            "residence_type": "자취", "income_level": "30-60",
+        })
 
     client.put(
         "/budget",
@@ -185,17 +199,6 @@ def test_impulse_warning_push_includes_transaction_id(client, auth_headers, monk
         },
         headers=auth_headers,
     )
-    # 같은 주 같은 카테고리 반복 소비(repeat_consumption)까지 겹쳐야 충동 점수가
-    # 경고 임계치(75)를 넘는다 — 새벽 시간대 + 예산 대비 큰 금액만으로는 부족함.
-    for _ in range(2):
-        client.post(
-            "/transactions",
-            json={
-                "amount": 90000, "type": "expense", "category": "쇼핑/패션", "merchant": "쇼핑몰",
-                "transaction_date": "2026-08-25", "transaction_time": "03:00",
-            },
-            headers=auth_headers,
-        )
     res = client.post(
         "/transactions",
         json={

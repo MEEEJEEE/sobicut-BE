@@ -32,6 +32,8 @@ User → Transaction → Emotion → Analysis
 - description
 - transaction_date
 - transaction_time
+- subjective_burden → 구매 시점 체감 경제 부담 1~5 (nullable, 충동 점수 β2용, v2)
+- low_impulse_bonus_granted → 신중한 소비 보너스 exp 중복 지급 방지 플래그 (v2)
 - created_at
 
 ### EmotionTag (구매 결정 심리특성, v3)

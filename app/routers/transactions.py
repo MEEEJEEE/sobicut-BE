@@ -22,7 +22,7 @@ from app.services import level as level_service
 from app.services import notification as notification_service
 from app.services.card_parser import CardParseError, CardParser
 from app.services.category_matcher import guess_category
-from app.services.impulse import transaction_impulse_score
+from app.services.impulse import risk_level, transaction_impulse_score
 from app.services.satisfaction import DAY_TYPES
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
@@ -123,6 +123,7 @@ def get_transaction(
     tx = _get_owned_transaction(db, user, transaction_id)
     detail = TransactionDetailOut.model_validate(tx, from_attributes=True)
     detail.impulse_score = transaction_impulse_score(db, tx, user)
+    detail.risk_level = risk_level(detail.impulse_score)
     return detail
 
 
@@ -204,5 +205,17 @@ def tag_emotions(
 
     if added:
         level_service.add_exp(db, user, level_service.EXP_EMOTION_TAG)
+
+    # 태그(스트레스/즉흥성/비교회피/충분한숙고/장기적가치)는 이 시점에야 붙으므로,
+    # 신중한 소비 보너스(충분한숙고+장기적가치 등으로 점수가 낮아지는 경우)는
+    # 거래 생성 시점이 아니라 여기서 재판정한다. 거래당 최대 1회만 지급.
+    db.flush()
+    db.refresh(tx)
+    if not tx.low_impulse_bonus_granted:
+        score = transaction_impulse_score(db, tx, user)
+        if score < level_service.LOW_IMPULSE_THRESHOLD:
+            level_service.add_exp(db, user, level_service.EXP_LOW_IMPULSE_BONUS)
+            tx.low_impulse_bonus_granted = True
+
     db.commit()
     return MessageResponse(message="감정 태그 등록 완료")

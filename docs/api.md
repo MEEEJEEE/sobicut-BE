@@ -166,9 +166,14 @@ Request:
   "merchant": "스타벅스",
   "description": "커피",
   "transaction_date": "2026-04-19",
-  "transaction_time": "14:30"
+  "transaction_time": "14:30",
+  "subjective_burden": 3
 }
 ```
+
+> `subjective_burden` (int, optional, 1~5): 구매 시점에 느낀 주관적 경제 부담
+> (1=전혀 없음 ~ 5=매우 큼). 충동 점수의 금액 부담(β2) 계산에 쓰인다. 생략하면
+> 예산 대비 구매금액 비율로 근사한다.
 
 Response:
 ```json
@@ -226,13 +231,17 @@ Response:
   "description": "커피",
   "transaction_date": "2026-04-19",
   "transaction_time": "14:30",
+  "subjective_burden": 3,
   "emotion_tags": [
     { "id": 1, "name": "스트레스" }
   ],
   "impulse_score": 72,
+  "risk_level": "경고",
   "created_at": "2026-04-19T14:30:00"
 }
 ```
+
+> `risk_level`: `"낮음"`(0~59) | `"주의"`(60~66) | `"경고"`(67 이상)
 
 ---
 
@@ -762,14 +771,14 @@ Response:
 ```json
 {
   "impulse_score": 72,
-  "threshold": 75,
-  "is_warning": false,
+  "risk_level": "경고",
+  "threshold": 67,
+  "caution_threshold": 60,
+  "is_warning": true,
   "breakdown": {
     "time_abnormal": 0.5,
     "amount_burden": 0.8,
-    "repeat_consumption": 0.5,
-    "peer_comparison": 0.6,
-    "regret_score": 0.7
+    "peer_comparison": 0.6
   },
   "emotion_breakdown": {
     "스트레스": 0.4,
@@ -784,7 +793,8 @@ Response:
       "merchant": "쿠팡",
       "amount": 45000,
       "transaction_date": "2026-04-15",
-      "impulse_score": 88
+      "impulse_score": 88,
+      "risk_level": "경고"
     }
   ],
   "peer_avg_impulse_score": 58,
@@ -792,10 +802,22 @@ Response:
     "this_week": 65,
     "last_week": 58,
     "diff": 7
+  },
+  "post_purchase": {
+    "regret_score": 0.3,
+    "sustained_satisfaction": 0.1
   }
 }
 ```
 
+> `risk_level`/`threshold`/`caution_threshold`: 충동 위험 지수 3단계 — `"낮음"`(0~59) |
+> `"주의"`(60~66, `caution_threshold`=60) | `"경고"`(67 이상, `threshold`=67).
+> `is_warning`은 `impulse_score >= threshold`와 동일.
+> `breakdown`: 결제 전 위험 점수(z)에 실제로 반영되는 행동 변수만 포함
+> (반복소비는 v2 로직에서 제거됨, 구매후후회는 `post_purchase`로 분리됨).
+> `post_purchase`: 구매 후 평가(구매후후회/지속적만족) 월 평균. **실시간 충동 점수에는
+> 반영되지 않는 참고/개인화용 값**이다 — 이미 끝난 구매의 위험 점수를 만족도가
+> 나중에 들어올 때마다 다시 계산하지 않기 위함.
 > `peer_avg_impulse_score`: 같은 그룹(거주형태+소득구간) 사용자들의 이번 달 평균 충동 점수.
 > 비교 대상 또래가 없으면 `null`.
 > `week_over_week`: 오늘 기준 최근 7일 vs 그 이전 7일의 평균 충동 점수. 해당 기간에

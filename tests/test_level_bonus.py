@@ -18,7 +18,10 @@ def _freeze(monkeypatch, frozen_date: dt.date):
     monkeypatch.setattr(level_batch, "date", _FrozenDate)
 
 
-def test_low_impulse_transaction_grants_bonus_exp(client, auth_headers):
+def test_neutral_transaction_no_bonus_at_creation(client, auth_headers):
+    """새 공식(bias=0)에서는 결제 전 변수만으로는 최저점이 50점이라, 생성 시점엔
+    보너스가 안 나간다 (감정 태그가 없는 상태라 충분한숙고/장기적가치 같은 억제
+    요인이 반영될 수 없음)."""
     level_before = client.get("/users/me/level", headers=auth_headers).json()
 
     res = client.post(
@@ -33,7 +36,58 @@ def test_low_impulse_transaction_grants_bonus_exp(client, auth_headers):
 
     level_after = client.get("/users/me/level", headers=auth_headers).json()
     gained = level_after["current_exp"] - level_before["current_exp"]
-    assert gained == level_service.EXP_TRANSACTION + level_service.EXP_LOW_IMPULSE_BONUS
+    assert gained == level_service.EXP_TRANSACTION
+
+
+def test_low_impulse_bonus_granted_after_protective_tagging(client, auth_headers):
+    """충분한숙고(-0.72)+장기적가치(-0.66) 태그를 붙이면 그제서야 점수가
+    LOW_IMPULSE_THRESHOLD(30) 아래로 내려가서, 태깅 시점에 보너스가 지급된다."""
+    tx_id = client.post(
+        "/transactions",
+        json={
+            "amount": 5000, "type": "expense", "category": "식비", "merchant": "편의점",
+            "transaction_date": "2026-08-25", "transaction_time": "12:00",
+        },
+        headers=auth_headers,
+    ).json()["id"]
+
+    emotions = client.get("/emotions", headers=auth_headers).json()
+    ids = [e["id"] for e in emotions if e["name"] in ("충분한숙고", "장기적가치")]
+    assert len(ids) == 2
+
+    level_before = client.get("/users/me/level", headers=auth_headers).json()
+    res = client.post(f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": ids}, headers=auth_headers)
+    assert res.status_code == 200
+    level_after = client.get("/users/me/level", headers=auth_headers).json()
+
+    gained = level_after["current_exp"] - level_before["current_exp"]
+    assert gained == level_service.EXP_EMOTION_TAG + level_service.EXP_LOW_IMPULSE_BONUS
+
+
+def test_low_impulse_bonus_not_granted_twice(client, auth_headers):
+    """같은 거래를 재태깅해도 보너스는 한 번만 지급된다."""
+    tx_id = client.post(
+        "/transactions",
+        json={
+            "amount": 5000, "type": "expense", "category": "식비", "merchant": "편의점",
+            "transaction_date": "2026-08-25", "transaction_time": "12:00",
+        },
+        headers=auth_headers,
+    ).json()["id"]
+
+    emotions = client.get("/emotions", headers=auth_headers).json()
+    ids = [e["id"] for e in emotions if e["name"] in ("충분한숙고", "장기적가치")]
+
+    client.post(f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": ids}, headers=auth_headers)
+    level_before = client.get("/users/me/level", headers=auth_headers).json()
+
+    # 재태깅(같은 태그 그대로 다시 보냄) -> 새 태그 추가가 없으니 EXP_EMOTION_TAG도 안 나가고,
+    # 보너스도 이미 지급됐으니 또 안 나가야 함
+    res = client.post(f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": ids}, headers=auth_headers)
+    assert res.status_code == 200
+    level_after = client.get("/users/me/level", headers=auth_headers).json()
+
+    assert level_after["current_exp"] == level_before["current_exp"]
 
 
 def test_high_impulse_transaction_no_bonus(client, auth_headers):
