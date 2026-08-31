@@ -383,6 +383,7 @@ Response:
     "transaction_id": 5,
     "merchant": "무신사",
     "amount": 89000,
+    "category": "쇼핑/패션",
     "transaction_date": "2026-06-01",
     "satisfactions": [
       { "day_type": "7일", "score": 5, "submitted_at": "2026-08-26T10:00:00" },
@@ -406,6 +407,7 @@ Response:
     "transaction_id": 5,
     "merchant": "무신사",
     "amount": 89000,
+    "category": "쇼핑/패션",
     "day_type": "7일",
     "due_date": "2026-04-26"
   }
