@@ -217,5 +217,10 @@ def tag_emotions(
             level_service.add_exp(db, user, level_service.EXP_LOW_IMPULSE_BONUS)
             tx.low_impulse_bonus_granted = True
 
+    # 태그가 붙어야 그 거래의 점수가 확정되고, 그게 이번 달 평균에 반영된다.
+    # 거래 생성 시점(태그 없음)에만 체크하면 태깅으로 뒤늦게 단계를 넘는 경우를 놓치므로 여기서도 재확인.
+    if tx.type == "expense":
+        notification_service._check_monthly_impulse_trend(db, user, tx)
+
     db.commit()
     return MessageResponse(message="감정 태그 등록 완료")

@@ -66,10 +66,11 @@ User → Transaction → Emotion → Analysis
 ### Notification
 - id (PK)
 - user_id (FK)
-- type → `"budget_weekly"` | `"budget_monthly"` | `"impulse_warning"` | `"heatmap_time"` | `"heatmap_day"` | `"satisfaction_request"`
+- type → `"budget_weekly"` | `"budget_monthly"` | `"impulse_monthly_trend"` | `"heatmap_time"` | `"heatmap_day"` | `"no_transaction_reminder"` | `"satisfaction_request"`
 - title
 - message
 - is_read (default: false)
+- transaction_id (FK, nullable) → `satisfaction_request`일 때만 값 있음
 - created_at
 
 ---
