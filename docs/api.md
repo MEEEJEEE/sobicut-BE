@@ -453,7 +453,14 @@ Query Parameters:
 - `type` (string, optional): 알림 종류 필터
   - `budget_weekly`: 주간 예산 초과 ✅ 구현됨 (거래 등록 시 체크, 충동지수예산초과알림 구독자에게 웹 푸시도 함께 발송)
   - `budget_monthly`: 월간 예산 초과 ✅ 구현됨 (위와 동일)
-  - `impulse_warning`: 충동 소비 경고 ✅ 구현됨 (위와 동일)
+  - `impulse_monthly_trend`: 이번 달 충동 지수 트렌드 경고 ✅ 구현됨 — 거래 등록/감정
+    태그 등록 시점마다 "이번 달 평균 충동 지수"(메인/`/reports/impulse`와 동일 값)를
+    재계산해서 75/90/99점 단계를 새로 넘을 때만 1회 발송. `User.last_impulse_alert_month`
+    /`last_impulse_alert_tier`로 같은 달 중복·재하락 후 재상승 반복 발송을 막는다.
+    거래 1건에 대한 알림이 아니라 `transaction_id`는 항상 `null`.
+    (v3 변경: 예전엔 건별 충동 점수가 경고 임계치를 넘을 때마다 `impulse_warning`으로
+    즉시 발송했는데, 감정 태그는 사용자가 직접 고른 값이라 그걸 그대로 알림으로
+    되돌려주는 게 정보값이 낮고 태그 1~2개만 있어도 거의 매 거래마다 떠서 폐지함)
   - `heatmap_time` / `heatmap_day`: 시간대·요일 소비 패턴 경고 ✅ 구현됨 — 이번 달
     히트맵에서 소비가 가장 잦은 요일/시간대(`GET /reports/heatmap`의 `peak`)에
     실제로 진입하는 시점(매일 06/11/14/19/23시 KST, 시간대 경계마다 체크)에
@@ -482,19 +489,19 @@ Response:
   },
   {
     "id": 2,
-    "type": "impulse_warning",
-    "title": "충동 소비 경고 ✂️",
-    "message": "방금 소비의 충동 점수가 88점이에요. 잠시 멈추고 다시 생각해봐요!",
+    "type": "impulse_monthly_trend",
+    "title": "이번 달 충동 지수 75점 돌파 ⚠️",
+    "message": "이번 달 평균 충동 지수가 75점이에요. 소비 패턴이 조금씩 충동적으로 흐르고 있어요.",
     "is_read": false,
-    "transaction_id": 42,
+    "transaction_id": null,
     "created_at": "2026-04-19T23:05:00"
   }
 ]
 ```
 
-> `transaction_id`: 특정 거래에 대한 알림(`impulse_warning`, `satisfaction_request`)일 때만
-> 값이 있고, 그 외(`budget_weekly`/`budget_monthly`/`heatmap_time`/`heatmap_day`/
-> `no_transaction_reminder`)는 항상 `null`. 클릭 시 해당 거래 상세/결과 페이지로
+> `transaction_id`: 특정 거래에 대한 알림(`satisfaction_request`)일 때만
+> 값이 있고, 그 외(`budget_weekly`/`budget_monthly`/`impulse_monthly_trend`/
+> `heatmap_time`/`heatmap_day`/`no_transaction_reminder`)는 항상 `null`. 클릭 시 해당 거래 상세/결과 페이지로
 > 이동시키는 용도.
 
 ---
@@ -557,24 +564,23 @@ Request:
 > — 4종 각각 독립적으로 구독/해제 가능 (온오프 토글용). 이 값은 구독 카테고리이며,
 > 실제 웹 푸시로 브라우저에 도착하는 payload의 `type`(아래 참고)과는 다른 값이다 —
 > 예를 들어 `"충동지수예산초과알림"` 카테고리를 구독하면 그 안의 세부 타입인
-> `budget_weekly`/`budget_monthly`/`impulse_warning` 알림을 전부 받는다.
+> `budget_weekly`/`budget_monthly`/`impulse_monthly_trend` 알림을 전부 받는다.
 
 **웹 푸시 payload 형식** (`pushManager`의 `push` 이벤트로 브라우저에 도착하는 데이터,
 서비스워커에서 `event.data.json()`으로 파싱):
 ```json
 {
-  "title": "충동 소비 경고 ✂️",
-  "body": "방금 소비의 충동 점수가 88점이에요. 잠시 멈추고 다시 생각해봐요!",
-  "type": "impulse_warning",
-  "transaction_id": 42
+  "title": "이번 달 충동 지수 75점 돌파 ⚠️",
+  "body": "이번 달 평균 충동 지수가 75점이에요. 소비 패턴이 조금씩 충동적으로 흐르고 있어요.",
+  "type": "impulse_monthly_trend"
 }
 ```
 > `type`: `GET /notifications` 응답의 `type`과 동일한 값
-> (`budget_weekly`/`budget_monthly`/`impulse_warning`/`heatmap_time`/`heatmap_day`/
+> (`budget_weekly`/`budget_monthly`/`impulse_monthly_trend`/`heatmap_time`/`heatmap_day`/
 > `no_transaction_reminder`/`satisfaction_request`). URL은 백엔드가 만들어 보내지 않으니
 > 이 `type`(+ 있으면 `transaction_id`)으로 프론트에서 클릭 시 이동할 라우트를 결정하면 된다.
-> `transaction_id`는 특정 거래에 대한 알림(`impulse_warning`, `satisfaction_request`)일
-> 때만 포함되고, 그 외에는 필드 자체가 없다.
+> `transaction_id`는 특정 거래에 대한 알림(`satisfaction_request`)일 때만
+> 포함되고, 그 외에는 필드 자체가 없다.
 
 Response:
 ```json

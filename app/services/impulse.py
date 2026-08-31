@@ -142,6 +142,27 @@ def _peer_avg_usage_rate(db: Session, user: User, year: int, month: int) -> floa
     return sum(rates) / len(rates) if rates else None
 
 
+def monthly_avg_impulse_score(db: Session, user: User, year: int, month: int) -> int:
+    """월 단위 평균 충동 위험 지수 (지출 거래별 점수 평균). 그 달 지출이 없으면 0.
+
+    메인/리포트 페이지에 노출되는 "이번 달 평균 충동 지수"와 알림 트리거가 항상
+    같은 값을 보도록 단일 소스로 둔다 (reports.py, notification.py가 공유).
+    """
+    txs = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == user.id,
+            Transaction.type == "expense",
+            func.extract("year", Transaction.transaction_date) == year,
+            func.extract("month", Transaction.transaction_date) == month,
+        )
+        .all()
+    )
+    if not txs:
+        return 0
+    return round(sum(transaction_impulse_score(db, tx, user) for tx in txs) / len(txs))
+
+
 def peer_avg_impulse_score(db: Session, user: User, year: int, month: int) -> int | None:
     """같은 그룹(거주형태+소득구간) 사용자들의 이번 달 평균 충동 점수"""
     peers = (

@@ -13,6 +13,7 @@ from app.services import wallet as wallet_service
 from app.services.impulse import (
     WEIGHTS,
     behavior_breakdown,
+    monthly_avg_impulse_score,
     peer_avg_impulse_score,
     post_purchase_breakdown,
     risk_level,
@@ -50,14 +51,14 @@ def _monthly_impulse(db: Session, user: User, year: int, month: int) -> tuple[in
         empty = {k: 0.0 for k in WEIGHTS["behavior"]}
         return 0, empty
 
-    scores, acc = [], {k: 0.0 for k in WEIGHTS["behavior"]}
+    acc = {k: 0.0 for k in WEIGHTS["behavior"]}
     for tx in txs:
-        scores.append(transaction_impulse_score(db, tx, user))
         for k, v in behavior_breakdown(db, tx, user).items():
             acc[k] += v
 
     n = len(txs)
-    return round(sum(scores) / n), {k: round(v / n, 2) for k, v in acc.items()}
+    score = monthly_avg_impulse_score(db, user, year, month)
+    return score, {k: round(v / n, 2) for k, v in acc.items()}
 
 
 def _wallet_summary(db: Session, user: User, year: int, month: int) -> dict:

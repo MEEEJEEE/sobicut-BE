@@ -171,23 +171,16 @@ def test_budget_exceeded_transaction_triggers_push(client, auth_headers, monkeyp
     assert "transaction_id" not in budget_payload  # 특정 거래 알림이 아니므로 없어야 함
 
 
-def test_impulse_warning_push_includes_transaction_id(client, auth_headers, monkeypatch):
-    """impulse_warning은 특정 거래에 대한 알림이므로 payload/응답에 transaction_id가 있어야 한다.
+def _setup_max_single_tx_impulse(client, auth_headers, tx_date="2026-08-25"):
+    """단건 거래로 충동 지수를 약 75점(z=0.14+0.54+0.42=1.10)까지 끌어올리는 공통 셋업.
 
-    새 충동 점수 공식(bias=0)에서 경고 임계치(67점)를 넘으려면 결제 전 변수
-    (이상시간대 0.14 + 금액부담 0.54 + 또래대비소비 0.42)를 전부 최대로 채워야 한다.
-    또래대비소비를 최대(1.0)로 만들려면 같은 그룹(거주형태+소득구간) 또래가 있고
-    이 유저의 지출이 또래보다 훨씬 많아야 한다 — 또래 지출이 0이면 표준편차가 0이 되어
-    분기상 바로 최댓값(1.0)으로 처리된다.
+    이상시간대(새벽 03시, 0.14) + 금액부담(예산 대비 90% 이상, 0.54) +
+    또래대비소비(또래 지출 0이라 표준편차 0 -> 바로 최댓값, 0.42) 조합.
+    같은 그룹(자취/30-60) 또래 2명을 지출 없이 만들어야 또래대비소비가 최댓값이 된다.
     """
-    calls = []
-    monkeypatch.setattr(web_push_service, "webpush", lambda **kwargs: calls.append(kwargs))
-    client.post("/notifications/subscribe", json=SUBSCRIBE_BODY, headers=auth_headers)
-
-    # 같은 그룹(자취/30-60) 또래 2명을 지출 없이 만들어서 또래대비소비를 최댓값으로 만든다
     for i in range(2):
         client.post("/auth/signup", json={
-            "email": f"peer_impulse_{i}@test.com", "password": "abcd1234", "nickname": f"peer{i}",
+            "email": f"peer_impulse_{tx_date}_{i}@test.com", "password": "abcd1234", "nickname": f"peer{i}",
             "residence_type": "자취", "income_level": "30-60",
         })
 
@@ -199,24 +192,78 @@ def test_impulse_warning_push_includes_transaction_id(client, auth_headers, monk
         },
         headers=auth_headers,
     )
-    res = client.post(
+    return client.post(
         "/transactions",
         json={
             "amount": 90000, "type": "expense", "category": "쇼핑/패션", "merchant": "쇼핑몰",
-            "transaction_date": "2026-08-25", "transaction_time": "03:00",
+            "transaction_date": tx_date, "transaction_time": "03:00",
         },
         headers=auth_headers,
     )
+
+
+def test_impulse_monthly_trend_alert_fires_at_75(client, auth_headers, monkeypatch):
+    """건별 impulse_warning은 폐지됐고, 이번 달 평균 충동 지수가 75를 넘을 때만 1회 알린다.
+    월간 트렌드 알림이라 특정 거래에 대한 게 아니므로 transaction_id는 없어야 한다.
+    """
+    calls = []
+    monkeypatch.setattr(web_push_service, "webpush", lambda **kwargs: calls.append(kwargs))
+    client.post("/notifications/subscribe", json=SUBSCRIBE_BODY, headers=auth_headers)
+
+    res = _setup_max_single_tx_impulse(client, auth_headers)
     assert res.status_code == 201
-    tx_id = res.json()["id"]
 
     payloads = [json.loads(c["data"]) for c in calls]
-    impulse_payload = next(p for p in payloads if p["type"] == "impulse_warning")
-    assert impulse_payload["transaction_id"] == tx_id
+    trend_payload = next(p for p in payloads if p["type"] == "impulse_monthly_trend")
+    assert "transaction_id" not in trend_payload
 
     notifications = client.get("/notifications", headers=auth_headers).json()
-    impulse_notifs = [n for n in notifications if n["type"] == "impulse_warning"]
-    assert impulse_notifs and impulse_notifs[0]["transaction_id"] == tx_id
+    trend_notifs = [n for n in notifications if n["type"] == "impulse_monthly_trend"]
+    assert trend_notifs and trend_notifs[0]["transaction_id"] is None
+    assert "75" in trend_notifs[0]["title"]
+
+
+def test_impulse_monthly_trend_alert_not_repeated_same_tier(client, auth_headers, monkeypatch):
+    """같은 달에 75 단계를 이미 알렸으면, 계속 75 이상이어도 다시 안 뜬다."""
+    calls = []
+    monkeypatch.setattr(web_push_service, "webpush", lambda **kwargs: calls.append(kwargs))
+    client.post("/notifications/subscribe", json=SUBSCRIBE_BODY, headers=auth_headers)
+
+    _setup_max_single_tx_impulse(client, auth_headers)
+    first_count = len([json.loads(c["data"]) for c in calls if json.loads(c["data"])["type"] == "impulse_monthly_trend"])
+    assert first_count == 1
+
+    # 같은 수준의 거래를 하나 더 등록해도 이미 75는 알렸으니 재발송 안 됨
+    client.post(
+        "/transactions",
+        json={
+            "amount": 90000, "type": "expense", "category": "쇼핑/패션", "merchant": "쇼핑몰2",
+            "transaction_date": "2026-08-25", "transaction_time": "03:30",
+        },
+        headers=auth_headers,
+    )
+    second_count = len([json.loads(c["data"]) for c in calls if json.loads(c["data"])["type"] == "impulse_monthly_trend"])
+    assert second_count == 1  # 늘지 않음
+
+
+def test_impulse_monthly_trend_alert_escalates_to_higher_tier(client, auth_headers, monkeypatch):
+    """75 알림을 받은 뒤 더 높은 90 단계를 넘으면 새로 알림이 가야 한다."""
+    calls = []
+    monkeypatch.setattr(web_push_service, "webpush", lambda **kwargs: calls.append(kwargs))
+    client.post("/notifications/subscribe", json=SUBSCRIBE_BODY, headers=auth_headers)
+
+    res = _setup_max_single_tx_impulse(client, auth_headers)
+    tx_id = res.json()["id"]
+
+    # 감정 태그(즉흥성+스트레스, 가중치 0.72+0.33)를 추가로 붙여서 90 이상까지 끌어올린다
+    emotions = client.get("/emotions", headers=auth_headers).json()
+    ids = [e["id"] for e in emotions if e["name"] in ("즉흥성", "스트레스")]
+    assert len(ids) == 2
+    client.post(f"/transactions/{tx_id}/emotions", json={"emotion_tag_ids": ids}, headers=auth_headers)
+
+    tiers_seen = [json.loads(c["data"])["title"] for c in calls if json.loads(c["data"])["type"] == "impulse_monthly_trend"]
+    assert any("75" in t for t in tiers_seen)
+    assert any("90" in t for t in tiers_seen)
 
 
 def test_transaction_without_subscription_does_not_error(client, auth_headers):

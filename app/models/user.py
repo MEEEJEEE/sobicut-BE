@@ -30,6 +30,9 @@ class User(Base):
     level: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     exp: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_budget_bonus_month: Mapped[str | None] = mapped_column(String(7), nullable=True)  # "YYYY-MM", 중복 지급 방지
+    # 이번 달 충동 지수 단계별(75/90/99) 알림 중복 방지 — 월 바뀌면 리셋, 더 높은 단계 넘을 때만 재발송
+    last_impulse_alert_month: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    last_impulse_alert_tier: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # soft delete
 
