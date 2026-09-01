@@ -9,9 +9,9 @@ from app.services.common import DAY_NAMES, get_time_slot, get_week_of_month
 
 CATEGORIES = ["식비", "고정지출", "교통", "생활", "쇼핑/패션", "자기계발", "문화/여가", "모임/기타"]
 
-# 히트맵 피크 푸시 알림 이름 (소비컷 컨셉)
-DAY_LABELS = {"월": "월요병 텅진 컷", "화": "루틴 소비 컷", "수": "루틴 소비 컷",
-              "목": "루틴 소비 컷", "금": "불금 입구 컷", "토": "주말 플렉스 컷", "일": "주말 플렉스 컷"}
+# 시간대컷 푸시 알림 이름 (소비컷 컨셉). 요일컷은 브랜드명 대신 요일명을 그대로 쓴다
+# ("루틴 소비 컷"처럼 화/수/목이 뭉뚱그려지는 걸 없애기 위해 v2에서 요일컷/시간대컷을
+# 완전히 독립된 두 지표로 분리함 — 더 이상 한쪽이 다른 쪽으로 대체되지 않는다).
 TIME_LABELS = {"아침": "갓생 시동 컷", "점심": "공강 텐션 컷", "저녁": "저녁 보상 컷",
                "밤": "야간 야망 컷", "새벽": "새벽 감성 컷"}
 
@@ -58,14 +58,26 @@ def heatmap_report(db: Session, user_id: int, year: int, month: int) -> dict:
     ]
     heatmap.sort(key=lambda x: (DAY_NAMES.index(x["day"]), ["아침", "점심", "저녁", "밤", "새벽"].index(x["time_slot"])))
 
-    peak = None
-    if cells:
-        (day, slot), _ = max(cells.items(), key=lambda kv: kv[1]["amount"])
-        # 요일 특화 라벨 우선(월/금/토/일), 그 외 요일은 시간대 라벨
-        label = DAY_LABELS[day] if day in {"월", "금", "토", "일"} else TIME_LABELS[slot]
-        peak = {"day": day, "time_slot": slot, "notification_label": label}
+    # 요일컷(요일별 합계 중 최대)과 시간대컷(시간대별 합계 중 최대)을 완전히 독립적으로 계산한다.
+    # 예전엔 (요일,시간대) 조합 셀 하나만 골라서 요일이 화/수/목이면 "루틴 소비 컷"이라는
+    # 시간대 라벨로 대체했는데, 이 폴백을 없애고 둘 다 항상 각자 기준으로 따로 뽑는다.
+    day_totals: dict[str, int] = {}
+    slot_totals: dict[str, int] = {}
+    for (day, slot), v in cells.items():
+        day_totals[day] = day_totals.get(day, 0) + v["amount"]
+        slot_totals[slot] = slot_totals.get(slot, 0) + v["amount"]
 
-    return {"heatmap": heatmap, "peak": peak}
+    peak_day = None
+    if day_totals:
+        top_day = max(day_totals, key=day_totals.get)
+        peak_day = {"day": top_day, "message": f"{top_day}요일에 소비가 가장 많아요"}
+
+    peak_time_slot = None
+    if slot_totals:
+        top_slot = max(slot_totals, key=slot_totals.get)
+        peak_time_slot = {"time_slot": top_slot, "label": TIME_LABELS[top_slot]}
+
+    return {"heatmap": heatmap, "peak_day": peak_day, "peak_time_slot": peak_time_slot}
 
 
 def budget_status(db: Session, user_id: int, year: int, month: int) -> dict:

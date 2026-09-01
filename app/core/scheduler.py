@@ -4,7 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.db.session import SessionLocal
-from app.services.heatmap_batch import process_heatmap_alerts
+from app.services.heatmap_batch import process_heatmap_day_alerts, process_heatmap_time_alerts
 from app.services.level_batch import process_monthly_budget_bonus
 from app.services.no_transaction_batch import process_no_transaction_reminders
 from app.services.satisfaction_batch import process_satisfaction_reminders
@@ -34,12 +34,22 @@ def _run_monthly_budget_bonus_batch() -> None:
         db.close()
 
 
-def _run_heatmap_batch() -> None:
+def _run_heatmap_day_batch() -> None:
     db = SessionLocal()
     try:
-        process_heatmap_alerts(db)
+        process_heatmap_day_alerts(db)
     except Exception:
-        logger.exception("히트맵 알림 배치 실행 중 오류")
+        logger.exception("히트맵 요일컷 알림 배치 실행 중 오류")
+    finally:
+        db.close()
+
+
+def _run_heatmap_time_batch() -> None:
+    db = SessionLocal()
+    try:
+        process_heatmap_time_alerts(db)
+    except Exception:
+        logger.exception("히트맵 시간대컷 알림 배치 실행 중 오류")
     finally:
         db.close()
 
@@ -70,12 +80,20 @@ def init_scheduler() -> None:
         name="Monthly budget compliance bonus batch",
         replace_existing=True,
     )
-    # 시간대 구분(아침 06/점심 11/저녁 14/밤 19/새벽 23) 경계마다 히트맵 피크 진입 체크
+    # 요일컷: 하루 시작 무렵 한 번만 체크 (오늘이 이번 달 최다 소비 요일인지)
     _scheduler.add_job(
-        _run_heatmap_batch,
+        _run_heatmap_day_batch,
+        CronTrigger(hour=9, minute=10, timezone="Asia/Seoul"),
+        id="heatmap_day_alerts",
+        name="Heatmap peak day alert batch",
+        replace_existing=True,
+    )
+    # 시간대컷: 시간대 구분(아침 06/점심 11/저녁 14/밤 19/새벽 23) 경계마다 체크
+    _scheduler.add_job(
+        _run_heatmap_time_batch,
         CronTrigger(hour="6,11,14,19,23", minute=0, timezone="Asia/Seoul"),
-        id="heatmap_alerts",
-        name="Heatmap peak entry alert batch",
+        id="heatmap_time_alerts",
+        name="Heatmap peak time-slot alert batch",
         replace_existing=True,
     )
     _scheduler.add_job(
