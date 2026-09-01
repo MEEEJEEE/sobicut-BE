@@ -92,8 +92,8 @@ def test_reports(client, auth_headers):
     assert shopping["ratio"] == 100.0
 
     heatmap = client.get("/reports/heatmap?year=2026&month=7", headers=auth_headers).json()
-    assert heatmap["peak"]["time_slot"] == "새벽"
-    assert heatmap["peak"]["day"] == "일"  # 2026-07-05는 일요일
+    assert heatmap["peak_time_slot"]["time_slot"] == "새벽"
+    assert heatmap["peak_day"]["day"] == "일"  # 2026-07-05는 일요일
 
     status = client.get("/reports/budget-status?year=2026&month=7", headers=auth_headers).json()
     assert status["monthly"]["spent"] == 150000
