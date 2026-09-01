@@ -201,7 +201,7 @@ def get_bpti(
     radar = bpti_service.emotion_radar(db, user.id, year, month)
     if result is None:
         return {"type": None, "label": None, "definition": None,
-                "message": "아직 감정 태그 데이터가 없어요. 소비에 감정을 기록해보세요!",
+                "message": "아직 소비 태그 데이터가 없어요. 나의 소비를 기록해보세요!",
                 "emotion_radar": radar}
     return {**result, "emotion_radar": radar}
 
