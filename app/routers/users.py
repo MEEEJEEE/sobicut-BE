@@ -60,7 +60,7 @@ def update_password(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not verify_password(body.current_password, user.password):
+    if user.password is not None and not verify_password(body.current_password, user.password):
         raise HTTPException(status_code=401, detail="현재 비밀번호가 올바르지 않습니다.")
     if not is_valid_password(body.new_password):
         raise HTTPException(status_code=422, detail=PASSWORD_RULE_MESSAGE)

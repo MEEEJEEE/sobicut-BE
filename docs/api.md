@@ -52,6 +52,44 @@ Response:
 
 ---
 
+### POST /auth/kakao
+카카오 소셜로그인/가입. 프론트가 카카오 JS SDK로 발급받은 `access_token`을 그대로 보내면
+백엔드가 카카오 사용자 정보 API로 검증한다 (별도 REST API 키/Client Secret 불필요).
+
+Request (최초 로그인 시에만 nickname/residence_type/income_level 필요, 기존 회원이면 무시됨):
+```json
+{
+  "access_token": "카카오 SDK가 발급한 access_token",
+  "nickname": "닉네임",
+  "residence_type": "자취",
+  "income_level": "30-60"
+}
+```
+
+Response:
+```json
+{
+  "access_token": "jwt-token",
+  "token_type": "bearer",
+  "is_new_user": true
+}
+```
+
+- `is_new_user`: 이번 요청으로 신규 가입됐으면 `true`, 기존 회원 로그인이면 `false`
+- 카카오 계정 이메일이 **이메일 인증된 상태**이고 기존 일반(이메일/비밀번호) 가입 계정과 이메일이
+  같으면 자동으로 계정을 연동한다 (같은 유저가 이메일/카카오 둘 다로 로그인 가능해짐)
+- 카카오 계정이 이메일 제공에 동의하지 않았으면 `422`, 최초 가입인데 nickname 등이 비어있으면
+  `422`, 이메일 미인증 상태에서 이미 사용 중인 이메일이면 `409`, 유효하지 않은 access_token이면
+  `401`
+- 카카오로만 가입한 계정은 `password`가 없음. 이런 계정으로 `POST /auth/login`(이메일/비밀번호
+  로그인)을 시도하면 `401` + "카카오 로그인으로 가입된 계정입니다." 안내가 내려간다
+- `PATCH /auth/withdraw`는 카카오 전용 계정이면 비밀번호 검증 없이 처리됨(바디의 `password`는
+  아무 값이나 넣어도 무방)
+- `PATCH /users/me/password`는 카카오 전용 계정이면 `current_password` 검증 없이 최초
+  비밀번호를 설정할 수 있음(이후 이메일/비밀번호 로그인도 가능해짐)
+
+---
+
 ### GET /auth/logout
 로그아웃 (토큰 무효화)
 

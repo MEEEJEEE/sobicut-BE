@@ -19,11 +19,20 @@ class User(Base):
             sqlite_where=text("deleted_at IS NULL"),
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        # 탈퇴 계정은 카카오 연동 유니크 제약에서도 제외 → 탈퇴 후 같은 카카오 계정으로 재가입 가능
+        Index(
+            "ix_users_kakao_id_active",
+            "kakao_id",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
-    password: Mapped[str] = mapped_column(String(255), nullable=False)  # bcrypt 해시
+    password: Mapped[str | None] = mapped_column(String(255), nullable=True)  # bcrypt 해시. 카카오 전용 계정은 None
+    kakao_id: Mapped[str | None] = mapped_column(String(50), nullable=True)  # 카카오 고유 회원번호
     nickname: Mapped[str] = mapped_column(String(50), nullable=False)
     residence_type: Mapped[str] = mapped_column(String(20), nullable=False)  # 자취 | 기숙사 | 통학
     income_level: Mapped[str] = mapped_column(String(20), nullable=False)  # under-30 | 30-60 | 60-100 | over-100
