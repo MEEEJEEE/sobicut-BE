@@ -248,10 +248,14 @@ Response:
     "emotion_tags": [
       { "id": 1, "name": "스트레스" }
     ],
+    "tags": ["카페", "생일선물"],
     "created_at": "2026-04-19T14:30:00"
   }
 ]
 ```
+
+> `tags`: 자유 텍스트 소비 태그 (`POST /transactions/{id}/tags` 참고). `emotion_tags`와
+> 완전히 별개이며 충동 점수 계산에 영향을 주지 않는다.
 
 ---
 
@@ -273,6 +277,7 @@ Response:
   "emotion_tags": [
     { "id": 1, "name": "스트레스" }
   ],
+  "tags": ["카페", "생일선물"],
   "impulse_score": 72,
   "risk_level": "경고",
   "created_at": "2026-04-19T14:30:00"
@@ -290,6 +295,32 @@ Response:
 
 ### DELETE /transactions/{id}
 거래 삭제
+
+---
+
+### POST /transactions/{id}/tags
+자유 텍스트 소비 태그 등록 (기록용). 점수 계산에 쓰이는 심리특성 태그(`emotion_tags`,
+아래 4번 섹션)와는 완전히 별개의 기능이며, 충동 점수(`GET /reports/impulse` 등)에
+전혀 영향을 주지 않는다. 개수/글자수 제한 없음.
+
+호출할 때마다 "현재 태그 목록 전체"로 간주해서 기존 태그는 전부 지우고 요청받은
+목록으로 교체한다(부분 추가가 아니라 교체 — `emotions` 엔드포인트와 동일한 방식).
+빈 배열을 보내면 태그가 전부 삭제된다. 앞뒤 공백은 제거되고, 빈 문자열과 중복
+항목은 자동으로 걸러진다.
+
+Request:
+```json
+{
+  "tags": ["카페", "생일선물"]
+}
+```
+
+Response:
+```json
+{
+  "message": "소비 태그 저장 완료"
+}
+```
 
 ---
 

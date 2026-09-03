@@ -6,13 +6,14 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
-from app.models import EmotionTag, Satisfaction, Transaction, TransactionEmotion, User
+from app.models import EmotionTag, Satisfaction, Transaction, TransactionEmotion, TransactionTag, User
 from app.schemas.auth import MessageResponse
 from app.schemas.emotion import TagEmotionsRequest
 from app.schemas.satisfaction import SatisfactionRecordOut
 from app.schemas.transaction import (
     CardMessageParseRequest,
     CardMessageParseResponse,
+    SetTagsRequest,
     TransactionCreate,
     TransactionCreateResponse,
     TransactionDetailOut,
@@ -34,7 +35,10 @@ CATEGORIES = {"식비", "고정지출", "교통", "생활", "쇼핑/패션", "�
 def _get_owned_transaction(db: Session, user: User, transaction_id: int) -> Transaction:
     tx = (
         db.query(Transaction)
-        .options(joinedload(Transaction.transaction_emotions).joinedload(TransactionEmotion.emotion_tag))
+        .options(
+            joinedload(Transaction.transaction_emotions).joinedload(TransactionEmotion.emotion_tag),
+            joinedload(Transaction.transaction_tags),
+        )
         .filter(Transaction.id == transaction_id, Transaction.user_id == user.id)
         .first()
     )
@@ -93,7 +97,10 @@ def list_transactions(
 ):
     q = (
         db.query(Transaction)
-        .options(joinedload(Transaction.transaction_emotions).joinedload(TransactionEmotion.emotion_tag))
+        .options(
+            joinedload(Transaction.transaction_emotions).joinedload(TransactionEmotion.emotion_tag),
+            joinedload(Transaction.transaction_tags),
+        )
         .filter(Transaction.user_id == user.id)
     )
     if year:
@@ -224,3 +231,32 @@ def tag_emotions(
 
     db.commit()
     return MessageResponse(message="감정 태그 등록 완료")
+
+
+@router.post("/{transaction_id}/tags", response_model=MessageResponse)
+def set_transaction_tags(
+    transaction_id: int,
+    body: SetTagsRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """자유 텍스트 소비 태그 등록 (기록용). 감정 태그(emotion_tag_ids)와 완전히 별개이며
+    충동 점수(impulse.py) 계산에는 전혀 반영되지 않는다. 개수/길이 제한 없음.
+
+    매 호출은 "현재 태그 목록 전체"를 의미하므로, 기존 태그는 전부 지우고 요청받은
+    목록으로 교체한다(emotion_tags 엔드포인트와 동일한 REPLACE 방식).
+    """
+    tx = _get_owned_transaction(db, user, transaction_id)
+
+    db.query(TransactionTag).filter(TransactionTag.transaction_id == tx.id).delete()
+
+    seen: set[str] = set()
+    for raw in body.tags:
+        content = raw.strip()
+        if not content or content in seen:
+            continue
+        seen.add(content)
+        db.add(TransactionTag(transaction_id=tx.id, content=content))
+
+    db.commit()
+    return MessageResponse(message="소비 태그 저장 완료")
