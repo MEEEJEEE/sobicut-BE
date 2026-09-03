@@ -38,7 +38,12 @@ class TransactionOut(BaseModel):
     transaction_time: time
     subjective_burden: int | None = None
     emotion_tags: list[EmotionTagOut]
+    tags: list[str]  # 자유 텍스트 소비 태그 (기록용, 감정 태그와 별개, 충동 점수 미반영)
     created_at: datetime
+
+
+class SetTagsRequest(BaseModel):
+    tags: list[str]
 
 
 class TransactionDetailOut(TransactionOut):

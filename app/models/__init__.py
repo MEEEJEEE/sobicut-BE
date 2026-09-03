@@ -1,6 +1,7 @@
 from app.models.user import User
 from app.models.transaction import Transaction
 from app.models.emotion import EmotionTag, TransactionEmotion
+from app.models.transaction_tag import TransactionTag
 from app.models.budget import Budget
 from app.models.satisfaction import Satisfaction
 from app.models.notification import Notification
@@ -13,6 +14,7 @@ __all__ = [
     "Transaction",
     "EmotionTag",
     "TransactionEmotion",
+    "TransactionTag",
     "Budget",
     "Satisfaction",
     "Notification",

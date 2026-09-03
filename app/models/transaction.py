@@ -30,8 +30,16 @@ class Transaction(Base):
     transaction_emotions = relationship(
         "TransactionEmotion", back_populates="transaction", cascade="all, delete-orphan"
     )
+    transaction_tags = relationship(
+        "TransactionTag", back_populates="transaction", cascade="all, delete-orphan"
+    )
     satisfactions = relationship("Satisfaction", back_populates="transaction", cascade="all, delete-orphan")
 
     @property
     def emotion_tags(self):
         return [te.emotion_tag for te in self.transaction_emotions]
+
+    @property
+    def tags(self):
+        """자유 텍스트 소비 태그 (기록용, 충동 점수 미반영)"""
+        return [t.content for t in self.transaction_tags]
