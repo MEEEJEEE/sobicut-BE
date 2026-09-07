@@ -6,11 +6,12 @@
 
 kakao_auth는 timeout=5.0을 쓰지만 LLM 생성 응답은 수십 초가 걸리므로
 여기서는 60.0을 쓴다.
+
+입력은 `app/services/weekly_factors.py`의 build_factors() 반환 dict다.
 """
 import json
 import logging
 import time
-from datetime import date
 
 import httpx
 
@@ -30,15 +31,46 @@ BACKOFF_BASE_SECONDS = 1.0
 # 낮추면 thinking 토큰 소모 후 응답이 잘려 JSON 파싱이 실패한다. 낮추지 말 것.
 MAX_OUTPUT_TOKENS = 4096
 
-# generate_prescription()이 summary(JSON 문자열)로 치환하는 자리표시 토큰.
-SUMMARY_PLACEHOLDER = "{{WEEKLY_SUMMARY_JSON}}"
+TEMPERATURE = 0.7
 
-# TODO: 검증된 프롬프트로 교체. summary가 들어갈 자리에 SUMMARY_PLACEHOLDER
-#       토큰({{WEEKLY_SUMMARY_JSON}})을 포함시키면 치환된다.
-PRESCRIPTION_PROMPT_TEMPLATE = """(TODO: 검증된 프롬프트 붙여넣기 — {{WEEKLY_SUMMARY_JSON}} 포함)"""
+# 처방 개수 / 항목 최대 글자수 (프롬프트 문구와 responseSchema가 공유하는 값)
+PRESCRIPTION_COUNT = 3
+PRESCRIPTION_MAX_LEN = 20
 
-# TODO: 검증된 responseSchema 붙여넣기 (Gemini generationConfig.responseSchema 형식)
-PRESCRIPTION_RESPONSE_SCHEMA: dict = {}
+PRESCRIPTION_RESPONSE_SCHEMA: dict = {
+    "type": "OBJECT",
+    "properties": {
+        "prescription": {
+            "type": "ARRAY",
+            "items": {"type": "STRING"},
+            "minItems": PRESCRIPTION_COUNT,
+            "maxItems": PRESCRIPTION_COUNT,
+        }
+    },
+    "required": ["prescription"],
+}
+
+# systemInstruction으로 넣는 고정 지시문. 9번 규칙은 원본에 없던 것을 추가한 것으로,
+# build_factors()가 빈 negative_factors를 반환할 수 있어 대비한다.
+PRESCRIPTION_PROMPT_TEMPLATE = f"""너는 20대 초중반 대학생의 소비 습관을 코칭하는 도우미다.
+입력으로 이번 주 소비 분석 결과가 주어진다. 이를 바탕으로 처방전 {PRESCRIPTION_COUNT}개를 작성하라.
+
+규칙:
+1. 반드시 정확히 {PRESCRIPTION_COUNT}개를 작성한다.
+2. 각 항목은 {PRESCRIPTION_MAX_LEN}자 이내로 쓴다. 공백 포함이다.
+3. negative_factors의 위쪽 항목부터 순서대로 대응하는 행동을 제안한다.
+4. 입력에 없는 숫자, 금액, 날짜, 카테고리를 만들어내지 않는다.
+5. 이번 주 안에 바로 실행할 수 있는 구체적 행동으로 쓴다.
+   "절약하기", "신중하게 생각하기" 같은 추상적 표현은 금지한다.
+6. 존댓말을 쓰되 명령형 종결("~하기")로 짧게 끝낸다.
+7. 비난하거나 죄책감을 주는 표현을 쓰지 않는다.
+8. positive_factors는 이미 잘하고 있는 부분이므로 고치라고 하지 않는다.
+9. negative_factors가 비어 있으면 positive_factors를 유지하는 행동을 제안한다.
+
+출력 형식:
+{{"prescription": ["...", "...", "..."]}}
+
+JSON만 출력한다. 설명, 인사말, 마크다운 코드블록을 붙이지 않는다."""
 
 
 class LLMPrescriptionError(Exception):
@@ -47,30 +79,6 @@ class LLMPrescriptionError(Exception):
 
 class _RetryableError(Exception):
     """재시도 대상 오류(네트워크 / 5xx / JSON 파싱 실패)를 나르는 내부용 예외."""
-
-
-def _json_safe(value):
-    """date 등 JSON 직렬화가 안 되는 값을 문자열로 변환한다."""
-    if isinstance(value, dict):
-        return {k: _json_safe(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json_safe(v) for v in value]
-    if isinstance(value, date):  # datetime도 date의 서브클래스라 함께 처리됨
-        return value.isoformat()
-    return value
-
-
-def _build_prompt(summary: dict) -> str:
-    """build_weekly_summary() 반환 dict를 JSON 문자열로 만들어 프롬프트에 주입한다.
-
-    summary 키 구조(app/services/weekly_summary.py 기준):
-      period_start(date), period_end(date), total_spent(int), transaction_count(int),
-      categories(list[{category, amount, ratio}]), avg_impulse_score(int|None),
-      top_transactions(list[{merchant, amount, category, impulse_score}]),
-      emotion_counts(dict[str, int])
-    """
-    summary_json = json.dumps(_json_safe(summary), ensure_ascii=False, indent=2)
-    return PRESCRIPTION_PROMPT_TEMPLATE.replace(SUMMARY_PLACEHOLDER, summary_json)
 
 
 def _concat_answer_parts(envelope: dict) -> str:
@@ -92,21 +100,34 @@ def _concat_answer_parts(envelope: dict) -> str:
     return "".join(chunks)
 
 
-def _parse_prescriptions(parsed) -> list[dict]:
-    """responseSchema 결과(리스트 또는 리스트를 감싼 dict)에서 처방 리스트를 꺼낸다."""
-    if isinstance(parsed, dict):
-        parsed = next((v for v in parsed.values() if isinstance(v, list)), None)
-    if not isinstance(parsed, list) or not parsed:
-        raise LLMPrescriptionError("Gemini 처방 응답 구조를 해석할 수 없습니다.")
-    if not all(isinstance(item, dict) for item in parsed):
-        raise LLMPrescriptionError("Gemini 처방 항목이 객체 형식이 아닙니다.")
-    return parsed
+def _finish_reason(envelope: dict) -> str | None:
+    """candidates[0].finishReason (예: "MAX_TOKENS", "SAFETY"). 없으면 None."""
+    candidates = envelope.get("candidates") or []
+    if not candidates:
+        return None
+    return candidates[0].get("finishReason")
 
 
-def _request_prescription(request_body: dict) -> list[dict]:
-    """Gemini에 1회 요청하고 처방 리스트를 반환한다.
+def _parse_prescriptions(parsed) -> list[str]:
+    """응답 본문이 {"prescription": [...]} 구조라는 전제로 문자열 리스트를 꺼낸다.
 
-    재시도 대상 오류는 _RetryableError로, 그 외(4xx·응답 구조 오류)는
+    개수·글자수는 responseSchema가 보장하므로 여기서 검증하지 않는다.
+    구조가 어긋나면 _RetryableError (일시적 생성 오류로 보고 재시도).
+    """
+    if not isinstance(parsed, dict):
+        raise _RetryableError("Gemini 처방 응답이 객체 형식이 아닙니다.")
+    prescription = parsed.get("prescription")
+    if not isinstance(prescription, list):
+        raise _RetryableError("Gemini 응답에 prescription 리스트가 없습니다.")
+    if not all(isinstance(item, str) for item in prescription):
+        raise _RetryableError("Gemini 처방 항목이 문자열이 아닙니다.")
+    return prescription
+
+
+def _request_prescription(request_body: dict) -> list[str]:
+    """Gemini에 1회 요청하고 처방 문자열 리스트를 반환한다.
+
+    재시도 대상 오류는 _RetryableError로, 그 외(4xx·빈 응답)는
     LLMPrescriptionError로 raise한다.
     """
     url = GEMINI_API_URL.format(model=settings.GEMINI_MODEL)
@@ -137,7 +158,9 @@ def _request_prescription(request_body: dict) -> list[dict]:
 
     text = _concat_answer_parts(envelope)
     if not text:
-        raise LLMPrescriptionError("Gemini 응답에 처방 텍스트가 없습니다.")
+        raise LLMPrescriptionError(
+            f"Gemini 응답에 처방 텍스트가 없습니다 (finishReason={_finish_reason(envelope)})."
+        )
 
     try:
         parsed = json.loads(text)
@@ -147,8 +170,8 @@ def _request_prescription(request_body: dict) -> list[dict]:
     return _parse_prescriptions(parsed)
 
 
-def generate_prescription(summary: dict) -> list[dict]:
-    """주간 소비 요약(build_weekly_summary 반환값)으로 소비 처방 리스트를 생성한다.
+def generate_prescription(factors: dict) -> list[str]:
+    """주간 팩터(build_factors 반환값)로 소비 처방 문자열 리스트를 생성한다.
 
     네트워크 오류 / 5xx / JSON 파싱 실패는 지수 백오프로 최대 3회까지 재시도한다.
     최종 실패 시 LLMPrescriptionError를 raise한다 (None을 반환하지 않는다).
@@ -156,12 +179,15 @@ def generate_prescription(summary: dict) -> list[dict]:
     if not settings.GEMINI_API_KEY:
         raise LLMPrescriptionError("GEMINI_API_KEY가 설정되지 않았습니다.")
 
+    user_prompt = "이번 주 분석 결과:\n" + json.dumps(factors, ensure_ascii=False, indent=2)
     request_body = {
-        "contents": [{"parts": [{"text": _build_prompt(summary)}]}],
+        "systemInstruction": {"parts": [{"text": PRESCRIPTION_PROMPT_TEMPLATE}]},
+        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseSchema": PRESCRIPTION_RESPONSE_SCHEMA,
             "maxOutputTokens": MAX_OUTPUT_TOKENS,
+            "temperature": TEMPERATURE,
         },
     }
 
