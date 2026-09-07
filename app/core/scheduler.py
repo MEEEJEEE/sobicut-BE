@@ -7,6 +7,7 @@ from app.db.session import SessionLocal
 from app.services.heatmap_batch import process_heatmap_day_alerts, process_heatmap_time_alerts
 from app.services.level_batch import process_monthly_budget_bonus
 from app.services.no_transaction_batch import process_no_transaction_reminders
+from app.services.prescription_batch import process_weekly_prescriptions
 from app.services.satisfaction_batch import process_satisfaction_reminders
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,16 @@ def _run_no_transaction_batch() -> None:
         db.close()
 
 
+def _run_prescription_batch() -> None:
+    db = SessionLocal()
+    try:
+        process_weekly_prescriptions(db)
+    except Exception:
+        logger.exception("주간 LLM 처방 생성 배치 실행 중 오류")
+    finally:
+        db.close()
+
+
 def init_scheduler() -> None:
     """앱 시작 시 호출. 각 배치를 한국 시간(KST) 기준으로 실행한다."""
     _scheduler.add_job(
@@ -101,6 +112,14 @@ def init_scheduler() -> None:
         CronTrigger(hour=22, minute=0, timezone="Asia/Seoul"),
         id="no_transaction_reminders",
         name="No-transaction-today reminder batch",
+        replace_existing=True,
+    )
+    # 주간 처방: 지난주가 막 끝난 월요일 새벽에 미리 생성
+    _scheduler.add_job(
+        _run_prescription_batch,
+        CronTrigger(day_of_week="mon", hour=4, minute=0, timezone="Asia/Seoul"),
+        id="weekly_prescriptions",
+        name="Weekly LLM prescription batch",
         replace_existing=True,
     )
     if not _scheduler.running:
