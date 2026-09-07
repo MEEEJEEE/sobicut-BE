@@ -8,6 +8,7 @@ from app.models.notification import Notification
 from app.models.push_subscription import PushSubscription
 from app.models.satisfaction_notification_log import SatisfactionNotificationLog
 from app.models.token_blacklist import TokenBlacklist
+from app.models.llm_prescription import LlmPrescription
 
 __all__ = [
     "User",
@@ -21,4 +22,5 @@ __all__ = [
     "PushSubscription",
     "SatisfactionNotificationLog",
     "TokenBlacklist",
+    "LlmPrescription",
 ]
