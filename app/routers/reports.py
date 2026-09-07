@@ -1,15 +1,16 @@
-from datetime import date
+from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import get_current_user
 from app.db.session import get_db
-from app.models import Transaction, User
+from app.models import LlmPrescription, Transaction, User
 from app.services import bpti as bpti_service
 from app.services import report as report_service
 from app.services import wallet as wallet_service
+from app.services.weekly_summary import get_iso_week_range
 from app.services.impulse import (
     WEIGHTS,
     behavior_breakdown,
@@ -259,3 +260,39 @@ def get_monthly_forecast(
 ):
     year, month = _now_ym(year, month)
     return report_service.monthly_forecast(db, user.id, year, month)
+
+
+@router.get("/prescription")
+def get_prescription(
+    week_start: date | None = Query(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """저장된 주간 LLM 처방 조회. DB에 저장된 것만 읽으며 LLM을 호출하지 않는다.
+
+    week_start 미지정 시 지난주 월요일이 기본값. 지정 시 월요일이 아니면 400.
+    처방이 없으면 404가 아니라 prescription=null로 200을 반환한다 (배치 미실행/
+    거래 없어 생성 스킵된 경우가 정상 경로이므로).
+    """
+    if week_start is None:
+        week_start = get_iso_week_range(date.today())[0] - timedelta(days=7)
+    elif week_start.weekday() != 0:
+        raise HTTPException(status_code=400, detail="week_start는 월요일이어야 합니다.")
+
+    week_end = week_start + timedelta(days=6)
+    record = (
+        db.query(LlmPrescription)
+        .filter(
+            LlmPrescription.user_id == user.id,
+            LlmPrescription.period_type == "weekly",
+            LlmPrescription.period_start == week_start,
+        )
+        .first()
+    )
+
+    return {
+        "period_start": week_start.isoformat(),
+        "period_end": week_end.isoformat(),
+        "prescription": record.content if record else None,
+        "generated_at": record.created_at.isoformat() if record else None,
+    }
