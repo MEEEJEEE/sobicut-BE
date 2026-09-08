@@ -8,6 +8,15 @@
 
 우선순위(룰 > 캐시 > LLM)는 고정이다. `_RULES` 가 갱신되면 그 결과가
 과거 LLM 캐시보다 우선해야 하므로 룰 매칭이 반드시 캐시보다 먼저다.
+
+룰 매칭은 2티어다:
+  (1) `_PREFIX_RULES` — startswith. PG사 접두사 제거 후 상호명이 그 키워드로
+      시작하는지 검사한다. contains 로 넣으면 라틴 문자 상호에 오분류되는
+      짧은 키워드("DOCUMENT" 안의 "CU" 등)를 여기 둔다.
+  (2) `_RULES` — contains.
+두 티어 모두 키워드 길이 내림차순으로 검사한다(_..._BY_LEN). 짧은 키워드가
+긴 키워드를 가로채지 못하게 하기 위함이며, 카테고리 dict 순서에는 의존하지
+않는다. 정렬은 모듈 로드 시 1회만 계산한다.
 """
 import logging
 import re
@@ -26,8 +35,8 @@ _WHITESPACE_RE = re.compile(r"\s+")
 _RULES: dict[str, list[str]] = {
     "식비": [
         "스타벅스", "이디야", "투썸", "커피", "카페", "식당", "분식", "치킨", "피자", "버거",
-        "맥도날드", "버거킹", "롯데리아", "배달의민족", "요기요", "쿠팡이츠", "GS25", "CU",
-        "세븐일레븐", "이마트24", "미니스톱", "김밥", "국밥", "고깃집", "족발", "보쌈", "떡볶이",
+        "맥도날드", "버거킹", "롯데리아", "배달의민족", "요기요", "쿠팡이츠",
+        "김밥", "국밥", "고깃집", "족발", "보쌈", "떡볶이",
     ],
     "교통": [
         "택시", "카카오T", "카카오택시", "버스", "지하철", "티맵", "주유소", "SK에너지",
@@ -35,6 +44,7 @@ _RULES: dict[str, list[str]] = {
     ],
     "생활": [
         "다이소", "올리브영", "약국", "세탁", "이마트", "홈플러스", "롯데마트", "드럭스토어",
+        "GS25", "세븐일레븐", "이마트24", "미니스톱",
     ],
     "쇼핑/패션": [
         "무신사", "쿠팡", "지마켓", "11번가", "옥션", "티몬", "위메프", "올웨이즈", "백화점",
@@ -53,20 +63,61 @@ _RULES: dict[str, list[str]] = {
     ],
 }
 
+# startswith 로 매칭할 규칙. contains 로 넣으면 라틴 문자 상호에 오분류되는
+# 짧은 키워드를 여기 둔다("CU" 가 "DOCUMENT"/"SECURITY" 안에 잡히는 문제).
+# 본격적인 사전(수백 건)은 별도 작업에서 투입 예정 — 지금은 CU 이동분만 둔다.
+_PREFIX_RULES: dict[str, list[str]] = {
+    "생활": ["씨유", "CU"],
+}
+
+# PG사 접두사 구분자. "카카오페이_중소3 - 레벨업PC카페 수유역점" 처럼 앞에 PG사
+# 이름이 붙은 실거래가 많아, 이 구분자 뒤쪽만 보고 매칭한다.
+_PG_SEPARATOR = " - "
+
+
+def _sort_by_len_desc(rules: dict[str, list[str]]) -> list[tuple[str, str]]:
+    """dict 를 (키워드대문자, 카테고리) 플랫 리스트로 펼쳐 키워드 길이 내림차순 정렬.
+
+    카테고리 dict 순서가 아니라 "가장 구체적인(긴) 키워드" 가 이기게 한다.
+    같은 길이는 stable sort 라 dict/리스트 삽입 순서를 유지한다.
+    모듈 로드 시 1회만 호출한다(매 매칭마다 정렬하지 않는다).
+    """
+    pairs = [(kw, category) for category, keywords in rules.items() for kw in keywords]
+    pairs.sort(key=lambda pair: len(pair[0]), reverse=True)
+    return [(kw.upper(), category) for kw, category in pairs]
+
+
+_PREFIX_RULES_BY_LEN: list[tuple[str, str]] = _sort_by_len_desc(_PREFIX_RULES)
+_RULES_BY_LEN: list[tuple[str, str]] = _sort_by_len_desc(_RULES)
+
 
 def guess_category(merchant: str | None) -> str | None:
     """가맹점명으로 카테고리를 추정한다. 매칭되는 키워드가 없으면 None (수동 태그 유도).
 
+    2티어: (1) `_PREFIX_RULES` startswith → (2) `_RULES` contains. 두 티어 모두
+    키워드 길이 내림차순으로 검사한다. `_PG_SEPARATOR` 가 있으면 마지막 구분자
+    뒤쪽만 사용하며, 그 결과가 빈 문자열이면 원본을 쓴다. 이 전처리는 이 함수
+    안에서만 적용하고 `normalize_merchant()` 는 건드리지 않는다.
+
     룰 전용 매칭. 캐시/LLM fallback 이 필요하면 `resolve_category()` 를 쓴다.
-    시그니처·동작은 다른 호출자(테스트 등) 영향 방지를 위해 바꾸지 않는다.
+    시그니처·반환 타입은 다른 호출자(테스트 등) 영향 방지를 위해 바꾸지 않는다.
     """
     if not merchant:
         return None
-    text = merchant.upper()
-    for category, keywords in _RULES.items():
-        for kw in keywords:
-            if kw.upper() in text:
-                return category
+
+    target = merchant
+    if _PG_SEPARATOR in target:
+        tail = target.rsplit(_PG_SEPARATOR, 1)[1]
+        if tail:
+            target = tail
+
+    text = target.upper()
+    for kw, category in _PREFIX_RULES_BY_LEN:
+        if text.startswith(kw):
+            return category
+    for kw, category in _RULES_BY_LEN:
+        if kw in text:
+            return category
     return None
 
 
