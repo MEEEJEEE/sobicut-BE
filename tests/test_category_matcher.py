@@ -1,4 +1,11 @@
-from app.services.category_matcher import guess_category
+from app.core.categories import CATEGORIES
+from app.services.category_matcher import _RULES, guess_category
+
+
+def test_rules_keys_are_subset_of_categories():
+    """룰 매칭이 반환하는 카테고리(_RULES 키)는 반드시 CATEGORIES 안에 있어야 한다.
+    오타로 CATEGORIES에 없는 키가 들어가면 그 카테고리는 영원히 매칭되지 않는다."""
+    assert set(_RULES) <= set(CATEGORIES), set(_RULES) - set(CATEGORIES)
 
 
 def test_guess_category_known_merchants():

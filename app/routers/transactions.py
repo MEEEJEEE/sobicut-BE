@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.categories import CATEGORIES
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models import EmotionTag, Satisfaction, Transaction, TransactionEmotion, TransactionTag, User
@@ -29,7 +30,6 @@ from app.services.satisfaction import DAY_TYPES
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 TRANSACTION_TYPES = {"income", "expense"}
-CATEGORIES = {"식비", "고정지출", "교통", "생활", "쇼핑/패션", "자기계발", "문화/여가", "모임/기타"}
 
 
 def _get_owned_transaction(db: Session, user: User, transaction_id: int) -> Transaction:
