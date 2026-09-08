@@ -13,6 +13,19 @@ def test_rules_keys_are_subset_of_categories():
     assert set(_RULES) <= set(CATEGORIES), set(_RULES) - set(CATEGORIES)
 
 
+def test_no_llm_calls_fixture_patches_the_symbol_resolve_category_uses():
+    """conftest 의 _no_llm_calls autouse fixture 가 올바른 경로를 패치했는지 확인.
+    (잘못된 경로를 패치하면 조용히 무력화되고 실제 Gemini 호출이 나간다.)"""
+    assert cm.classify_category("아무거나") is None
+    assert getattr(cm.classify_category, "__name__", "") == "<lambda>"
+
+
+def test_no_llm_calls_fixture_allows_per_test_override(monkeypatch):
+    """LLM 반환값이 필요한 테스트는 각자 monkeypatch 로 fixture 를 덮어쓸 수 있어야 한다."""
+    monkeypatch.setattr(cm, "classify_category", lambda name: "식비")
+    assert cm.classify_category("x") == "식비"
+
+
 def test_normalize_merchant():
     assert normalize_merchant("스타벅스 강남 2호점") == "스타벅스강남2호점"
     assert normalize_merchant("  GS25  ") == "gs25"
@@ -102,6 +115,8 @@ def test_transactions_parse_includes_category(client, auth_headers):
 
 
 def test_transactions_parse_category_null_when_unmatched(client, auth_headers):
+    # 룰·캐시 미스 + LLM 도 분류 실패 → category=null 로 200 정상 응답.
+    # (conftest 의 _no_llm_calls autouse fixture 가 LLM 호출을 차단한다.)
     res = client.post(
         "/transactions/parse",
         json={"message_text": "신한카드 승인되었습니다. [듣도보도못한가게] 5,500원 2026-08-22 14:32"},
