@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.categories import CATEGORIES
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models import EmotionTag, Satisfaction, Transaction, TransactionEmotion, TransactionTag, User
@@ -22,14 +23,13 @@ from app.schemas.transaction import (
 from app.services import level as level_service
 from app.services import notification as notification_service
 from app.services.card_parser import CardParseError, CardParser
-from app.services.category_matcher import guess_category
+from app.services.category_matcher import resolve_category
 from app.services.impulse import risk_level, transaction_impulse_score
 from app.services.satisfaction import DAY_TYPES
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 TRANSACTION_TYPES = {"income", "expense"}
-CATEGORIES = {"식비", "고정지출", "교통", "생활", "쇼핑/패션", "자기계발", "문화/여가", "모임/기타"}
 
 
 def _get_owned_transaction(db: Session, user: User, transaction_id: int) -> Transaction:
@@ -75,12 +75,14 @@ def create_transaction(
 def parse_card_message(
     body: CardMessageParseRequest,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     try:
         result = CardParser().parse(body.message_text)
     except CardParseError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    result["category"] = guess_category(result["merchant"])
+    # 룰 > 캐시 > LLM. 어떤 경우에도 예외 없이 카테고리 문자열 또는 None 을 돌려준다.
+    result["category"] = resolve_category(db, result["merchant"])
     return result
 
 
