@@ -10,7 +10,8 @@ from app.models import LlmPrescription, Transaction, User
 from app.services import bpti as bpti_service
 from app.services import report as report_service
 from app.services import wallet as wallet_service
-from app.services.weekly_summary import get_iso_week_range
+from app.services.weekly_factors import build_factors
+from app.services.weekly_summary import build_weekly_summary, get_iso_week_range
 from app.services.impulse import (
     WEIGHTS,
     behavior_breakdown,
@@ -268,11 +269,14 @@ def get_prescription(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """저장된 주간 LLM 처방 조회. DB에 저장된 것만 읽으며 LLM을 호출하지 않는다.
+    """주간 LLM 처방 + 팩터 문장 조회. DB에 저장된 처방만 읽으며 LLM을 호출하지 않는다.
 
     week_start 미지정 시 지난주 월요일이 기본값. 지정 시 월요일이 아니면 400.
-    처방이 없으면 404가 아니라 prescription=null로 200을 반환한다 (배치 미실행/
+    처방이 없어도 404가 아니라 prescription=null로 200을 반환한다 (배치 미실행/
     거래 없어 생성 스킵된 경우가 정상 경로이므로).
+
+    negative_factors / positive_factors는 코드로 계산하므로(LLM 무관) 처방
+    레코드가 없어도 항상 채워서 내려준다. 거래가 없어 팩터가 비면 빈 배열.
     """
     if week_start is None:
         week_start = get_iso_week_range(date.today())[0] - timedelta(days=7)
@@ -290,9 +294,15 @@ def get_prescription(
         .first()
     )
 
+    summary = build_weekly_summary(db, user, week_start)
+    prev_summary = build_weekly_summary(db, user, week_start - timedelta(days=7))
+    factors = build_factors(summary, prev_summary)
+
     return {
         "period_start": week_start.isoformat(),
         "period_end": week_end.isoformat(),
         "prescription": record.content if record else None,
         "generated_at": record.created_at.isoformat() if record else None,
+        "negative_factors": factors["negative_factors"],
+        "positive_factors": factors["positive_factors"],
     }
