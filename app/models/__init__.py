@@ -9,6 +9,7 @@ from app.models.push_subscription import PushSubscription
 from app.models.satisfaction_notification_log import SatisfactionNotificationLog
 from app.models.token_blacklist import TokenBlacklist
 from app.models.llm_prescription import LlmPrescription
+from app.models.merchant_category_map import MerchantCategoryMap
 
 __all__ = [
     "User",
@@ -23,4 +24,5 @@ __all__ = [
     "SatisfactionNotificationLog",
     "TokenBlacklist",
     "LlmPrescription",
+    "MerchantCategoryMap",
 ]
