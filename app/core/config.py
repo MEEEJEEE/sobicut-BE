@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Gemini API (주간 소비 처방 생성)
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.6-flash"
+    # 미분류 거래 카테고리 LLM fallback 전용 모델.
+    # POST /transactions/parse 의 사용자 대기 중 동기 응답 경로에서 쓰이므로
+    # 처방용(GEMINI_MODEL)과 분리해 가볍게/빠르게 교체할 수 있게 둔다.
+    GEMINI_MODEL_CATEGORY: str = "gemini-3.6-flash"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
