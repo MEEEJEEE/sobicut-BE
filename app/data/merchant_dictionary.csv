@@ -1,0 +1,346 @@
+merchant_name,category,match_type,note
+관리비,고정지출,contains,주거
+도시가스,고정지출,contains,주거
+보험,고정지출,contains,
+수도요금,고정지출,contains,주거
+알뜰폰,고정지출,contains,통신
+월세,고정지출,contains,주거
+전기,고정지출,contains,기존 _RULES
+전세,고정지출,contains,주거
+통신,고정지출,contains,기존 _RULES
+ANTHROPIC,고정지출,prefix,해외 구독 결제
+DB손해보험,고정지출,prefix,보험
+KB손해보험,고정지출,prefix,보험
+KT,고정지출,prefix,통신
+LG유플러스,고정지출,prefix,통신
+NETFLIX,고정지출,prefix,정기구독
+OPENAI,고정지출,prefix,정기구독
+SKT,고정지출,prefix,통신
+SK텔레콤,고정지출,prefix,통신
+YOUTUBEPREMIUM,고정지출,prefix,정기구독
+넷플릭스,고정지출,prefix,정기구독
+디즈니플러스,고정지출,prefix,정기구독
+라프텔,고정지출,prefix,정기구독
+리디,고정지출,prefix,리디북스 포함 · 구독제
+메리츠화재,고정지출,prefix,보험
+멜론,고정지출,prefix,정기구독
+밀리의서재,고정지출,prefix,정기구독 / 도서 성격도 있음
+벅스,고정지출,prefix,정기구독
+삼성화재,고정지출,prefix,보험
+스포티파이,고정지출,prefix,정기구독
+왓챠,고정지출,prefix,정기구독
+웨이브,고정지출,prefix,정기구독
+유튜브프리미엄,고정지출,prefix,정기구독
+지니뮤직,고정지출,prefix,정기구독
+챗GPT,고정지출,prefix,정기구독
+쿠팡플레이,고정지출,prefix,정기구독
+티빙,고정지출,prefix,정기구독
+플로,고정지출,prefix,정기구독
+한국전력,고정지출,prefix,주거
+현대해상,고정지출,prefix,보험
+ITX,교통,contains,기존 _RULES
+KTX,교통,contains,기존 _RULES
+고속버스,교통,contains,
+버스,교통,contains,기존 _RULES
+시외버스,교통,contains,
+주유소,교통,contains,
+주차장,교통,contains,
+지하철,교통,contains,
+카카오택시,교통,contains,기존 _RULES
+택시,교통,contains,
+통행료,교통,contains,
+티맵,교통,contains,기존 _RULES
+하이패스,교통,contains,
+GS칼텍스,교통,prefix,주유
+S-OIL,교통,prefix,주유
+SK에너지,교통,prefix,주유
+SRT,교통,prefix,
+그린카,교통,prefix,
+따릉이,교통,prefix,
+모바일티머니,교통,prefix,티머니 prefix로는 안 잡힘
+서울교통공사,교통,prefix,
+쏘카,교통,prefix,
+우버,교통,prefix,
+카카오T,교통,prefix,카카오택시 포함
+캐시비,교통,prefix,
+코레일,교통,prefix,
+타다,교통,prefix,
+티머니,교통,prefix,
+현대오일뱅크,교통,prefix,주유
+경조사,모임/기타,contains,
+기프티콘,모임/기타,contains,선물
+꽃집,모임/기타,contains,선물
+조의금,모임/기타,contains,
+축의금,모임/기타,contains,
+화훼,모임/기타,contains,선물
+회비,모임/기타,contains,
+카카오톡선물하기,모임/기타,prefix,선물
+PC방,문화/여가,contains,
+PC카페,문화/여가,contains,
+게스트하우스,문화/여가,contains,여행
+공연,문화/여가,contains,
+노래방,문화/여가,contains,
+노래연습장,문화/여가,contains,
+당구장,문화/여가,contains,
+방탈출,문화/여가,contains,
+보드게임,문화/여가,contains,
+볼링,문화/여가,contains,기존 _RULES
+볼링장,문화/여가,contains,
+전시,문화/여가,contains,
+코인노래방,문화/여가,contains,
+콘서트,문화/여가,contains,
+펜션,문화/여가,contains,여행
+호텔,문화/여가,contains,여행
+CGV,문화/여가,prefix,영화
+STEAM,문화/여가,prefix,게임
+구글플레이,문화/여가,prefix,게임/앱 결제
+네이버웹툰,문화/여가,prefix,
+넥슨,문화/여가,prefix,게임
+넷마블,문화/여가,prefix,게임
+놀유니버스,문화/여가,prefix,인터파크·야놀자 통합 법인
+닌텐도,문화/여가,prefix,게임
+대한항공,문화/여가,prefix,여행 · 교통으로 볼 여지 있음
+롯데시네마,문화/여가,prefix,영화
+메가박스,문화/여가,prefix,영화
+멜론티켓,문화/여가,prefix,공연 · 멜론보다 먼저 매칭
+모두투어,문화/여가,prefix,여행
+부킹닷컴,문화/여가,prefix,여행
+스팀,문화/여가,prefix,게임 · STEAM 포함
+씨네큐,문화/여가,prefix,영화
+아고다,문화/여가,prefix,여행
+아시아나항공,문화/여가,prefix,여행
+앱스토어,문화/여가,prefix,게임/앱 결제
+야놀자,문화/여가,prefix,여행
+에어부산,문화/여가,prefix,여행
+에어비앤비,문화/여가,prefix,여행
+여기어때,문화/여가,prefix,여행
+예스24티켓,문화/여가,prefix,공연 · 예스24보다 먼저 매칭
+인터파크,문화/여가,prefix,공연
+제주항공,문화/여가,prefix,여행
+진에어,문화/여가,prefix,여행
+카카오페이지,문화/여가,prefix,
+티웨이항공,문화/여가,prefix,여행
+티켓링크,문화/여가,prefix,공연
+플레이스테이션,문화/여가,prefix,게임
+하나투어,문화/여가,prefix,여행
+건강검진,생활,contains,건강/의료
+내과,생활,contains,건강/의료
+드럭스토어,생활,contains,기존 _RULES
+병원,생활,contains,건강/의료
+보건소,생활,contains,건강/의료
+산부인과,생활,contains,건강/의료
+세탁,생활,contains,
+안과,생활,contains,건강/의료
+약국,생활,contains,건강/의료
+의원,생활,contains,건강/의료
+이비인후과,생활,contains,건강/의료
+정신건강의학과,생활,contains,건강/의료
+정형외과,생활,contains,건강/의료
+치과,생활,contains,건강/의료
+편의점,생활,contains,
+피부과,생활,contains,건강/의료
+한의원,생활,contains,건강/의료
+CJ대한통운,생활,prefix,
+CU,생활,prefix,
+GS25,생활,prefix,
+노브랜드,생활,prefix,
+다이소,생활,prefix,
+롯데마트,생활,prefix,
+미니스톱,생활,prefix,
+세븐일레븐,생활,prefix,
+씨유,생활,prefix,CU 실제 카드 표기. CU prefix로는 안 잡힘
+알파문구,생활,prefix,
+우체국,생활,prefix,
+이마트,생활,prefix,
+이마트24,생활,prefix,이마트보다 먼저 매칭
+코스트코,생활,prefix,
+트레이더스,생활,prefix,
+홈플러스,생활,prefix,
+ZARA,쇼핑/패션,contains,기존 _RULES
+네일,쇼핑/패션,contains,패션/미용
+미용실,쇼핑/패션,contains,패션/미용
+백화점,쇼핑/패션,contains,기존 _RULES
+속눈썹,쇼핑/패션,contains,패션/미용
+아울렛,쇼핑/패션,contains,
+올웨이즈,쇼핑/패션,contains,기존 _RULES
+왁싱,쇼핑/패션,contains,패션/미용
+위메프,쇼핑/패션,contains,기존 _RULES
+이발,쇼핑/패션,contains,패션/미용
+지마켓,쇼핑/패션,contains,기존 _RULES
+티몬,쇼핑/패션,contains,기존 _RULES
+헤어,쇼핑/패션,contains,패션/미용
+11번가,쇼핑/패션,prefix,
+29CM,쇼핑/패션,prefix,
+ABC마트,쇼핑/패션,prefix,
+AK플라자,쇼핑/패션,prefix,
+G마켓,쇼핑/패션,prefix,
+H&M,쇼핑/패션,prefix,
+SSG닷컴,쇼핑/패션,prefix,
+W컨셉,쇼핑/패션,prefix,
+나이키,쇼핑/패션,prefix,
+네이버쇼핑,쇼핑/패션,prefix,
+뉴발란스,쇼핑/패션,prefix,
+당근마켓,쇼핑/패션,prefix,
+랄라블라,쇼핑/패션,prefix,
+롯데백화점,쇼핑/패션,prefix,
+무신사,쇼핑/패션,prefix,
+번개장터,쇼핑/패션,prefix,
+브랜디,쇼핑/패션,prefix,
+삼성전자판매,쇼핑/패션,prefix,
+슈마커,쇼핑/패션,prefix,
+스파오,쇼핑/패션,prefix,
+신세계백화점,쇼핑/패션,prefix,
+아디다스,쇼핑/패션,prefix,
+아리따움,쇼핑/패션,prefix,
+알리익스프레스,쇼핑/패션,prefix,
+애플스토어,쇼핑/패션,prefix,
+에뛰드,쇼핑/패션,prefix,
+에이블리,쇼핑/패션,prefix,
+에잇세컨즈,쇼핑/패션,prefix,
+옥션,쇼핑/패션,prefix,
+올리브영,쇼핑/패션,prefix,
+유니클로,쇼핑/패션,prefix,
+이니스프리,쇼핑/패션,prefix,
+자라,쇼핑/패션,prefix,
+전자랜드,쇼핑/패션,prefix,
+지그재그,쇼핑/패션,prefix,
+쿠팡,쇼핑/패션,prefix,
+탑텐,쇼핑/패션,prefix,
+테무,쇼핑/패션,prefix,
+토니모리,쇼핑/패션,prefix,
+하이마트,쇼핑/패션,prefix,
+현대백화점,쇼핑/패션,prefix,
+고깃집,식비,contains,기존 _RULES
+국밥,식비,contains,기존 _RULES
+김밥,식비,contains,기존 _RULES
+떡볶이,식비,contains,기존 _RULES
+라멘,식비,contains,
+버거,식비,contains,기존 _RULES
+보쌈,식비,contains,기존 _RULES
+분식,식비,contains,기존 _RULES
+술집,식비,contains,
+식당,식비,contains,
+아이스크림할인점,식비,contains,
+족발,식비,contains,기존 _RULES
+치킨,식비,contains,기존 _RULES
+카페,식비,contains,기존 _RULES
+칼국수,식비,contains,
+커피,식비,contains,기존 _RULES
+타코,식비,contains,
+투썸,식비,contains,기존 _RULES
+포차,식비,contains,
+피자,식비,contains,
+호프,식비,contains,
+BBQ,식비,prefix,
+BHC,식비,prefix,
+KFC,식비,prefix,
+고봉민김밥,식비,prefix,
+공차,식비,prefix,
+교촌치킨,식비,prefix,
+굽네치킨,식비,prefix,
+김가네,식비,prefix,
+김밥천국,식비,prefix,
+네네치킨,식비,prefix,
+노브랜드버거,식비,prefix,노브랜드보다 먼저 매칭
+더벤티,식비,prefix,
+던킨,식비,prefix,던킨도너츠 포함
+도미노피자,식비,prefix,
+두찜,식비,prefix,
+드롭탑,식비,prefix,
+땡겨요,식비,prefix,
+뚜레쥬르,식비,prefix,
+롯데리아,식비,prefix,
+맘스터치,식비,prefix,
+매머드커피,식비,prefix,매머드익스프레스 포함
+맥도날드,식비,prefix,
+메가커피,식비,prefix,메가MGC커피 포함
+명랑핫도그,식비,prefix,
+미소야,식비,prefix,
+바르다김선생,식비,prefix,
+반올림피자,식비,prefix,
+배달의민족,식비,prefix,
+배민클럽,식비,prefix,배민 구독
+배스킨라빈스,식비,prefix,
+버거킹,식비,prefix,
+본도시락,식비,prefix,
+본죽,식비,prefix,
+블루보틀,식비,prefix,
+빕스,식비,prefix,
+빽다방,식비,prefix,
+빽보이피자,식비,prefix,
+새마을식당,식비,prefix,
+서브웨이,식비,prefix,
+설빙,식비,prefix,
+성심당,식비,prefix,
+쉐이크쉑,식비,prefix,
+스타벅스,식비,prefix,
+신전떡볶이,식비,prefix,
+써브웨이,식비,prefix,
+아웃백,식비,prefix,아웃백스테이크하우스
+애슐리,식비,prefix,
+엔제리너스,식비,prefix,
+역전우동,식비,prefix,
+엽기떡볶이,식비,prefix,
+요거프레소,식비,prefix,
+요기요,식비,prefix,
+우아한형제들,식비,prefix,배달의민족 법인명. 카드 명세에 이 이름으로 찍힘
+이디야,식비,prefix,이디야커피 포함
+이삭토스트,식비,prefix,
+자담치킨,식비,prefix,
+죠스떡볶이,식비,prefix,
+처갓집양념치킨,식비,prefix,
+청년다방,식비,prefix,
+카페베네,식비,prefix,
+커피빈,식비,prefix,
+컴포즈커피,식비,prefix,
+쿠팡이츠,식비,prefix,쿠팡보다 먼저 매칭
+크리스피크림,식비,prefix,
+탐앤탐스,식비,prefix,
+투썸플레이스,식비,prefix,
+파리바게뜨,식비,prefix,
+파스쿠찌,식비,prefix,
+파파존스,식비,prefix,
+폴바셋,식비,prefix,
+푸라닭,식비,prefix,
+프랭크버거,식비,prefix,
+피자스쿨,식비,prefix,
+피자헛,식비,prefix,
+하이디라오,식비,prefix,
+한국맥도날드,식비,prefix,맥도날드 법인 표기
+한솥도시락,식비,prefix,
+한신포차,식비,prefix,
+할리스,식비,prefix,
+홍콩반점,식비,prefix,
+YES24,자기계발,contains,기존 _RULES
+골프,자기계발,contains,운동
+과외,자기계발,contains,
+독서실,자기계발,contains,
+멀티캠퍼스,자기계발,contains,기존 _RULES
+복싱,자기계발,contains,운동
+서점,자기계발,contains,도서
+수영장,자기계발,contains,운동
+스터디카페,자기계발,contains,
+요가,자기계발,contains,운동
+응시료,자기계발,contains,
+인강,자기계발,contains,기존 _RULES
+크로스핏,자기계발,contains,운동
+클라이밍,자기계발,contains,운동
+토익,자기계발,contains,
+피트니스,자기계발,contains,운동
+필라테스,자기계발,contains,운동
+학원,자기계발,contains,
+헬스,자기계발,contains,운동
+헬스장,자기계발,contains,기존 _RULES
+교보문고,자기계발,prefix,도서
+듀오링고,자기계발,prefix,교육
+메가스터디,자기계발,prefix,교육
+시원스쿨,자기계발,prefix,교육
+알라딘,자기계발,prefix,도서
+야나두,자기계발,prefix,교육
+에듀윌,자기계발,prefix,교육
+영풍문고,자기계발,prefix,도서
+예스24,자기계발,prefix,도서
+인프런,자기계발,prefix,교육
+클래스101,자기계발,prefix,교육
+패스트캠퍼스,자기계발,prefix,교육
+해커스,자기계발,prefix,교육
