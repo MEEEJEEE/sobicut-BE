@@ -9,14 +9,16 @@
 우선순위(룰 > 캐시 > LLM)는 고정이다. `_RULES` 가 갱신되면 그 결과가
 과거 LLM 캐시보다 우선해야 하므로 룰 매칭이 반드시 캐시보다 먼저다.
 
-룰 매칭은 2티어다:
-  (1) `_PREFIX_RULES` — startswith. PG사 접두사 제거 후 상호명이 그 키워드로
-      시작하는지 검사한다. contains 로 넣으면 라틴 문자 상호에 오분류되는
-      짧은 키워드("DOCUMENT" 안의 "CU" 등)를 여기 둔다.
+룰 매칭(`_match_rules`)은 2티어다:
+  (1) `_PREFIX_RULES` — startswith. contains 로 넣으면 라틴 문자 상호에
+      오분류되는 짧은 키워드("DOCUMENT" 안의 "CU" 등)를 여기 둔다.
   (2) `_RULES` — contains.
 두 티어 모두 키워드 길이 내림차순으로 검사한다(_..._BY_LEN). 짧은 키워드가
 긴 키워드를 가로채지 못하게 하기 위함이며, 카테고리 dict 순서에는 의존하지
 않는다. 정렬은 모듈 로드 시 1회만 계산한다.
+
+`guess_category` 는 PG사 접두사(" - ") 대응으로 이 매칭을 뒤쪽 → 원본 순으로
+최대 2회 호출한다.
 """
 import logging
 import re
@@ -71,7 +73,8 @@ _PREFIX_RULES: dict[str, list[str]] = {
 }
 
 # PG사 접두사 구분자. "카카오페이_중소3 - 레벨업PC카페 수유역점" 처럼 앞에 PG사
-# 이름이 붙은 실거래가 많아, 이 구분자 뒤쪽만 보고 매칭한다.
+# 이름이 붙은 실거래가 많다. guess_category 가 이 구분자 뒤쪽 → 원본 순으로
+# 최대 2회 매칭을 시도한다.
 _PG_SEPARATOR = " - "
 
 
@@ -91,27 +94,9 @@ _PREFIX_RULES_BY_LEN: list[tuple[str, str]] = _sort_by_len_desc(_PREFIX_RULES)
 _RULES_BY_LEN: list[tuple[str, str]] = _sort_by_len_desc(_RULES)
 
 
-def guess_category(merchant: str | None) -> str | None:
-    """가맹점명으로 카테고리를 추정한다. 매칭되는 키워드가 없으면 None (수동 태그 유도).
-
-    2티어: (1) `_PREFIX_RULES` startswith → (2) `_RULES` contains. 두 티어 모두
-    키워드 길이 내림차순으로 검사한다. `_PG_SEPARATOR` 가 있으면 마지막 구분자
-    뒤쪽만 사용하며, 그 결과가 빈 문자열이면 원본을 쓴다. 이 전처리는 이 함수
-    안에서만 적용하고 `normalize_merchant()` 는 건드리지 않는다.
-
-    룰 전용 매칭. 캐시/LLM fallback 이 필요하면 `resolve_category()` 를 쓴다.
-    시그니처·반환 타입은 다른 호출자(테스트 등) 영향 방지를 위해 바꾸지 않는다.
-    """
-    if not merchant:
-        return None
-
-    target = merchant
-    if _PG_SEPARATOR in target:
-        tail = target.rsplit(_PG_SEPARATOR, 1)[1]
-        if tail:
-            target = tail
-
-    text = target.upper()
+def _match_rules(text: str) -> str | None:
+    """대문자로 변환된 상호명에 2티어 매칭: (1) `_PREFIX_RULES` startswith →
+    (2) `_RULES` contains. 두 티어 모두 키워드 길이 내림차순으로 검사한다."""
     for kw, category in _PREFIX_RULES_BY_LEN:
         if text.startswith(kw):
             return category
@@ -119,6 +104,31 @@ def guess_category(merchant: str | None) -> str | None:
         if kw in text:
             return category
     return None
+
+
+def guess_category(merchant: str | None) -> str | None:
+    """가맹점명으로 카테고리를 추정한다. 매칭되는 키워드가 없으면 None (수동 태그 유도).
+
+    PG사 접두사("카카오T_바이크 - (주)카카오모빌리티") 대응: `_PG_SEPARATOR` 가
+    있으면 마지막 구분자 뒤쪽으로 먼저 매칭을 시도하고, 실패하면 원본으로 다시
+    시도한다. 뒤쪽에만 유효 정보가 있는 경우와 앞쪽에만 있는 경우를 모두
+    잡는다. 이 전처리는 이 함수 안에서만 적용하고 `normalize_merchant()` 는
+    건드리지 않는다.
+
+    룰 전용 매칭. 캐시/LLM fallback 이 필요하면 `resolve_category()` 를 쓴다.
+    시그니처·반환 타입은 다른 호출자(테스트 등) 영향 방지를 위해 바꾸지 않는다.
+    """
+    if not merchant:
+        return None
+
+    if _PG_SEPARATOR in merchant:
+        tail = merchant.rsplit(_PG_SEPARATOR, 1)[1]
+        if tail:
+            hit = _match_rules(tail.upper())
+            if hit is not None:
+                return hit
+
+    return _match_rules(merchant.upper())
 
 
 def normalize_merchant(merchant: str | None) -> str | None:

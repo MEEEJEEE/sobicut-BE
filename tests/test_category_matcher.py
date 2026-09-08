@@ -62,6 +62,26 @@ def test_guess_category_strips_pg_prefix():
     assert guess_category("PG_A - PG_B - 스타벅스 강남") == "식비"
 
 
+def test_guess_category_falls_back_to_original_when_tail_unmatched():
+    # 뒤쪽("(주)카카오모빌리티")에는 매칭 키워드가 없고 앞쪽("카카오T_바이크")에
+    # 유효 정보가 있는 경우 → 원본으로 재시도해서 잡는다.
+    assert guess_category("카카오T_바이크 - (주)카카오모빌리티") == "교통"
+
+
+def test_guess_category_tail_match_skips_original_fallback(monkeypatch):
+    # 뒤쪽으로 매칭되면 원본 재시도를 하지 않는다 (_match_rules 1회 호출).
+    calls = []
+    real = cm._match_rules
+
+    def spy(text):
+        calls.append(text)
+        return real(text)
+
+    monkeypatch.setattr(cm, "_match_rules", spy)
+    assert guess_category("카카오페이_중소3 - 스타벅스 강남") == "식비"
+    assert calls == ["스타벅스 강남".upper()]
+
+
 def test_guess_category_without_pg_separator_unchanged():
     assert guess_category("스타벅스 강남점") == "식비"
     assert guess_category("듣도보도못한상호명123") is None
