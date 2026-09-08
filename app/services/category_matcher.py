@@ -1,10 +1,27 @@
 """가맹점명 기반 소비 카테고리 자동 매칭.
 
-스펙은 "LLM 사용"을 요청했지만, 카드 문자 파싱과 동일한 이유(비용·API 키·지연
-없이 즉시 응답)로 우선 규칙/키워드 기반으로 구현했다. 매칭 실패 시 None을
-반환하며, 프론트는 이 경우 사용자가 직접 카테고리를 고르도록 안내하면 된다.
-(추후 정확도가 부족하면 이 모듈의 `guess_category()`만 LLM 호출로 교체하면 됨)
+1차는 규칙/키워드 기반(`guess_category`) — 비용·지연 없이 즉시 응답한다.
+룰로 분류하지 못한 가맹점은 `resolve_category()`가 캐시(merchant_category_map)
+→ LLM(`category_llm.classify_category`) 순으로 fallback 하고, LLM 결과는
+캐시에 저장해 재사용한다. 모든 단계 실패 시 None 을 반환하며, 프론트는
+사용자가 직접 카테고리를 고르도록 안내하면 된다.
+
+우선순위(룰 > 캐시 > LLM)는 고정이다. `_RULES` 가 갱신되면 그 결과가
+과거 LLM 캐시보다 우선해야 하므로 룰 매칭이 반드시 캐시보다 먼저다.
 """
+import logging
+import re
+
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
+
+from app.core.categories import CATEGORIES
+from app.models import MerchantCategoryMap
+from app.services.category_llm import classify_category
+
+logger = logging.getLogger(__name__)
+
+_WHITESPACE_RE = re.compile(r"\s+")
 
 _RULES: dict[str, list[str]] = {
     "식비": [
@@ -38,7 +55,11 @@ _RULES: dict[str, list[str]] = {
 
 
 def guess_category(merchant: str | None) -> str | None:
-    """가맹점명으로 카테고리를 추정한다. 매칭되는 키워드가 없으면 None (수동 태그 유도)."""
+    """가맹점명으로 카테고리를 추정한다. 매칭되는 키워드가 없으면 None (수동 태그 유도).
+
+    룰 전용 매칭. 캐시/LLM fallback 이 필요하면 `resolve_category()` 를 쓴다.
+    시그니처·동작은 다른 호출자(테스트 등) 영향 방지를 위해 바꾸지 않는다.
+    """
     if not merchant:
         return None
     text = merchant.upper()
@@ -47,3 +68,76 @@ def guess_category(merchant: str | None) -> str | None:
             if kw.upper() in text:
                 return category
     return None
+
+
+def normalize_merchant(merchant: str | None) -> str | None:
+    """캐시 키·LLM 입력용 정규화: 공백을 전부 제거하고 소문자로 통일한다.
+
+    "스타벅스 강남점" 과 "스타벅스강남점" 을 같은 키로 모으기 위한 것이며,
+    지점명까지 떼지는 않는다("스타벅스강남점" != "스타벅스역삼점").
+    guess_category(룰 매칭)에는 이 정규화를 적용하지 않는다 — 원본을 넘긴다.
+    """
+    if not merchant:
+        return None
+    normalized = _WHITESPACE_RE.sub("", merchant).lower()
+    return normalized or None
+
+
+def _cache_category(db: Session, normalized_name: str, category: str) -> None:
+    """LLM 분류 결과를 저장한다.
+
+    동시 요청으로 같은 normalized_name 이 들어와도 ON CONFLICT DO NOTHING 으로
+    무시한다. 저장 실패(연결 오류·경합 등)는 로그만 남기고 삼킨다 — 이미 확보한
+    매칭 결과에는 영향을 주지 않는다.
+    """
+    stmt = (
+        pg_insert(MerchantCategoryMap)
+        .values(normalized_name=normalized_name, category=category, source="llm")
+        .on_conflict_do_nothing(index_elements=["normalized_name"])
+    )
+    try:
+        db.execute(stmt)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.warning(
+            "카테고리 캐시 저장 실패 (무시): %s -> %s", normalized_name, category, exc_info=True
+        )
+
+
+def resolve_category(db: Session, merchant: str | None) -> str | None:
+    """가맹점명으로 카테고리를 결정한다. 우선순위: 룰 > 캐시 > LLM.
+
+    어떤 단계에서도 예외를 밖으로 내지 않는다 (parse 응답은 실패하면 안 되고
+    category=null 로 정상 응답해야 한다). 최종 실패 시 None.
+    """
+    rule_hit = guess_category(merchant)
+    if rule_hit is not None:
+        return rule_hit
+
+    normalized = normalize_merchant(merchant)
+    if normalized is None:
+        return None
+
+    cached = (
+        db.query(MerchantCategoryMap)
+        .filter(MerchantCategoryMap.normalized_name == normalized)
+        .first()
+    )
+    if cached is not None:
+        return cached.category
+
+    try:
+        category = classify_category(normalized)
+    except Exception:
+        logger.warning("카테고리 LLM 호출 중 예외 (무시)", exc_info=True)
+        return None
+
+    if category is None:
+        return None
+    if category not in CATEGORIES:
+        logger.warning("카테고리 LLM 이 허용되지 않은 값 반환 (저장 안 함): %r", category)
+        return None
+
+    _cache_category(db, normalized, category)
+    return category
