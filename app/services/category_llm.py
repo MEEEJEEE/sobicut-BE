@@ -3,14 +3,20 @@
 이 함수는 POST /transactions/parse — 사용자가 응답을 기다리는 동기 경로 —
 에서 호출된다. 응답 지연이 곧 UI 멈춤이므로 주간 처방 생성
 (app/services/llm_prescription.py: timeout 60s / 재시도 3회)과 달리
-timeout 5s / 재시도 1회 / maxOutputTokens 1024 로 짧게 잡는다.
+timeout(settings.GEMINI_CATEGORY_TIMEOUT, 기본 10s) / 재시도 0회 /
+maxOutputTokens 1024 로 짧게 잡는다.
+
+재시도를 0회로 둔 이유: 실측상 이 경로의 지배적 실패 모드는 timeout 이고,
+timeout 뒤 재시도가 성공하기까지 8.7초가 더 걸린다. timeout 10s + 재시도 1회면
+최악 20초를 사용자가 동기로 기다리게 되는데, 이 값은 룰·캐시 미스 후의 fallback
+이라 실패해도 "미분류" 로 degrade 될 뿐이다. 대기 상한(10s)을 지키는 편이 낫다.
 
 _concat_answer_parts / _finish_reason 는 llm_prescription.py 와 중복이다.
 동작 중인 처방 코드를 건드리지 않으려고 지금은 복사해 둔다.
 추후 공용 Gemini 클라이언트 모듈로 통합 검토.
 
 프롬프트에는 정규화된 상호명만 전달한다. 금액·시간·사용자 정보는 절대 보내지 않는다.
-어떤 실패(타임아웃·API 오류·재시도 소진·파싱 실패·enum 밖 값·API 키 미설정)도
+어떤 실패(타임아웃·API 오류·할당량 초과(429)·파싱 실패·enum 밖 값·API 키 미설정)도
 예외를 올리지 않고 None 을 반환한다. 각 경우는 로그로 남긴다.
 """
 import json
@@ -25,8 +31,7 @@ logger = logging.getLogger(__name__)
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
-REQUEST_TIMEOUT = 5.0
-MAX_ATTEMPTS = 2  # 최초 1회 + 재시도 1회
+MAX_ATTEMPTS = 1  # 재시도 없음 — 근거는 모듈 docstring 참고
 MAX_OUTPUT_TOKENS = 1024
 TEMPERATURE = 0.0
 
@@ -95,13 +100,21 @@ def _request_once(url: str, request_body: dict) -> str | None:
                 "Content-Type": "application/json",
             },
             json=request_body,
-            timeout=REQUEST_TIMEOUT,
+            timeout=settings.GEMINI_CATEGORY_TIMEOUT,
         )
     except httpx.HTTPError as e:
         raise _RetryableError(f"Gemini 요청 실패: {e}") from e
 
     if response.status_code >= 500:
         raise _RetryableError(f"Gemini 서버 오류 (status={response.status_code}).")
+    if response.status_code == 429:
+        # 무료 티어 RPD(일일 요청 수) 초과. 재시도해도 같은 429 이므로 즉시 포기한다.
+        logger.warning(
+            "카테고리 LLM 할당량 초과 (429) — Gemini 무료 티어 RPD 초과로 추정. "
+            "재시도 없이 미분류 처리: %s",
+            response.text[:200],
+        )
+        return None
     if response.status_code != 200:
         logger.warning(
             "카테고리 LLM 요청 거부 (status=%s): %s", response.status_code, response.text[:200]
@@ -158,7 +171,7 @@ def classify_category(normalized_name: str) -> str | None:
             if attempt < MAX_ATTEMPTS - 1:
                 logger.warning("카테고리 LLM 재시도 (%d/%d): %s", attempt + 1, MAX_ATTEMPTS - 1, e)
                 continue
-            logger.warning("카테고리 LLM 재시도 소진: %s", e)
+            logger.warning("카테고리 LLM 일시적 오류 — 미분류 처리: %s", e)
             return None
 
     if category is None:
