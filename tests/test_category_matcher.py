@@ -56,8 +56,9 @@ def test_guess_category_cu_contains_no_longer_misclassifies():
 
 def test_guess_category_strips_pg_prefix():
     # PG사 접두사가 붙어도 " - " 뒤쪽으로 매칭한다.
-    # (사전 신규 항목에 비의존: 기존 "카페"(식비) 규칙으로 검증)
-    assert guess_category("카카오페이_중소3 - 레벨업PC카페 수유역점") == "식비"
+    # ("카페"(식비, contains) 규칙으로 검증. CSV 사전에 "PC카페"(문화/여가)가
+    #  있으므로 그와 겹치지 않도록 상호명에서 "PC" 는 뺐다.)
+    assert guess_category("카카오페이_중소3 - 레벨업카페 수유역점") == "식비"
     # 구분자가 여러 번이면 마지막 것 기준으로 뒤쪽 사용
     assert guess_category("PG_A - PG_B - 스타벅스 강남") == "식비"
 

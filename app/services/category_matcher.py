@@ -29,48 +29,17 @@ from sqlalchemy.orm import Session
 from app.core.categories import CATEGORIES
 from app.models import MerchantCategoryMap
 from app.services.category_llm import classify_category
+from app.services.merchant_dictionary import PREFIX_RULES as _PREFIX_RULES
+from app.services.merchant_dictionary import RULES as _RULES
 
 logger = logging.getLogger(__name__)
 
 _WHITESPACE_RE = re.compile(r"\s+")
 
-_RULES: dict[str, list[str]] = {
-    "식비": [
-        "스타벅스", "이디야", "투썸", "커피", "카페", "식당", "분식", "치킨", "피자", "버거",
-        "맥도날드", "버거킹", "롯데리아", "배달의민족", "요기요", "쿠팡이츠",
-        "김밥", "국밥", "고깃집", "족발", "보쌈", "떡볶이",
-    ],
-    "교통": [
-        "택시", "카카오T", "카카오택시", "버스", "지하철", "티맵", "주유소", "SK에너지",
-        "GS칼텍스", "S-OIL", "현대오일뱅크", "코레일", "ITX", "SRT", "KTX",
-    ],
-    "생활": [
-        "다이소", "올리브영", "약국", "세탁", "이마트", "홈플러스", "롯데마트", "드럭스토어",
-        "GS25", "세븐일레븐", "이마트24", "미니스톱",
-    ],
-    "쇼핑/패션": [
-        "무신사", "쿠팡", "지마켓", "11번가", "옥션", "티몬", "위메프", "올웨이즈", "백화점",
-        "ZARA", "유니클로", "나이키", "아디다스", "29CM", "W컨셉",
-    ],
-    "자기계발": [
-        "교보문고", "YES24", "알라딘", "인강", "학원", "클래스101", "멀티캠퍼스", "패스트캠퍼스",
-        "헬스장", "필라테스", "요가",
-    ],
-    "문화/여가": [
-        "CGV", "메가박스", "롯데시네마", "넷플릭스", "왓챠", "디즈니플러스", "멜론", "지니뮤직",
-        "PC방", "노래방", "볼링",
-    ],
-    "고정지출": [
-        "SKT", "KT", "LG유플러스", "통신", "보험", "월세", "관리비", "가스", "전기",
-    ],
-}
-
-# startswith 로 매칭할 규칙. contains 로 넣으면 라틴 문자 상호에 오분류되는
-# 짧은 키워드를 여기 둔다("CU" 가 "DOCUMENT"/"SECURITY" 안에 잡히는 문제).
-# 본격적인 사전(수백 건)은 별도 작업에서 투입 예정 — 지금은 CU 이동분만 둔다.
-_PREFIX_RULES: dict[str, list[str]] = {
-    "생활": ["씨유", "CU"],
-}
+# 가맹점 사전은 app/data/merchant_dictionary.csv 로 분리돼 있고
+# app.services.merchant_dictionary 가 로드 시 검증·구성한다.
+#   _PREFIX_RULES: dict[str, list[str]]  (match_type == "prefix", startswith)
+#   _RULES:        dict[str, list[str]]  (match_type == "contains")
 
 # PG사 접두사 구분자. "카카오페이_중소3 - 레벨업PC카페 수유역점" 처럼 앞에 PG사
 # 이름이 붙은 실거래가 많다. guess_category 가 이 구분자 뒤쪽 → 원본 순으로
