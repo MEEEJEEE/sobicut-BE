@@ -16,6 +16,7 @@ def test_update_profile_fields(client, auth_headers):
     settings = client.get("/users/me/settings", headers=auth_headers).json()
     assert settings["nickname"] == "새닉네임"
     assert settings["residence_type"] == "기숙사"
+    assert settings["is_kakao_account"] is False
 
     # 잘못된 값 거부
     assert client.patch("/users/me/residence-type", json={"residence_type": "옥탑방"}, headers=auth_headers).status_code == 422

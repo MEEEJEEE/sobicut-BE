@@ -48,3 +48,8 @@ class User(Base):
     transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
     budget = relationship("Budget", back_populates="user", uselist=False, cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+
+    @property
+    def is_kakao_account(self) -> bool:
+        """카카오 로그인으로 가입했거나 카카오 계정이 연동된 경우 True"""
+        return self.kakao_id is not None
