@@ -757,9 +757,14 @@ Response:
   "email": "test@test.com",
   "nickname": "user1",
   "residence_type": "자취",
-  "income_level": "30-60"
+  "income_level": "30-60",
+  "is_kakao_account": false
 }
 ```
+
+> `is_kakao_account`: 카카오로 가입했거나 카카오 계정이 연동된 경우 `true` (`kakao_id`가 있는 계정).
+> 이 값이 `true`인 계정은 비밀번호가 없을 수 있으므로(`PATCH /auth/withdraw`,
+> `PATCH /users/me/password` 참고), 프론트에서 비밀번호 관련 UI 분기에 활용할 수 있다.
 
 ---
 

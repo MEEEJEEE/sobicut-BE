@@ -21,6 +21,7 @@ class UserSettingsOut(BaseModel):
     nickname: str
     residence_type: str
     income_level: str
+    is_kakao_account: bool
 
 
 class LevelOut(BaseModel):

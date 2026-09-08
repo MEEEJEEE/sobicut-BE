@@ -34,6 +34,20 @@ def test_kakao_signup_creates_new_user(client, monkeypatch):
         db.close()
 
 
+def test_kakao_account_reflected_in_settings(client, monkeypatch):
+    monkeypatch.setattr(auth_router, "fetch_kakao_user", _fake_kakao_user())
+    login_res = client.post("/auth/kakao", json={
+        "access_token": "fake-token",
+        "nickname": "카카오유저",
+        "residence_type": "자취",
+        "income_level": "30-60",
+    })
+    headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
+
+    settings = client.get("/users/me/settings", headers=headers).json()
+    assert settings["is_kakao_account"] is True
+
+
 def test_kakao_signup_missing_profile_fields_rejected(client, monkeypatch):
     monkeypatch.setattr(auth_router, "fetch_kakao_user", _fake_kakao_user())
 
