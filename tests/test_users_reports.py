@@ -109,6 +109,46 @@ def test_reports(client, auth_headers):
     assert monthly_temp["weekly_temps"][0]["temp"] == 120  # 150000/125000
 
 
+def test_emotion_expense_ratio_is_independent_per_tag_unlike_breakdown(client, auth_headers):
+    """emotion_breakdown(태그 부착 횟수 기준, 합계 100%)과 달리 emotion_expense_ratio는
+    거래 하나에 태그가 여러 개 붙어도 태그별로 독립 집계되어 합계가 100%를 넘을 수 있다."""
+    emotions = client.get("/emotions", headers=auth_headers).json()
+    stress_id = next(e["id"] for e in emotions if e["name"] == "스트레스")
+    impulsive_id = next(e["id"] for e in emotions if e["name"] == "즉흥성")
+
+    tx1 = client.post(
+        "/transactions",
+        json={
+            "amount": 50000, "type": "expense", "category": "쇼핑/패션", "merchant": "A",
+            "transaction_date": "2026-07-05", "transaction_time": "14:00",
+        },
+        headers=auth_headers,
+    ).json()["id"]
+    client.post(f"/transactions/{tx1}/emotions", json={"emotion_tag_ids": [stress_id, impulsive_id]}, headers=auth_headers)
+
+    tx2 = client.post(
+        "/transactions",
+        json={
+            "amount": 30000, "type": "expense", "category": "식비", "merchant": "B",
+            "transaction_date": "2026-07-06", "transaction_time": "12:00",
+        },
+        headers=auth_headers,
+    ).json()["id"]
+    client.post(f"/transactions/{tx2}/emotions", json={"emotion_tag_ids": [stress_id]}, headers=auth_headers)
+
+    impulse = client.get("/reports/impulse?year=2026&month=7", headers=auth_headers).json()
+
+    # emotion_breakdown: 태그 부착 횟수(스트레스 2회, 즉흥성 1회) 기준 분포, 합계 100%
+    assert impulse["emotion_breakdown"]["스트레스"] == 0.67
+    assert impulse["emotion_breakdown"]["즉흥성"] == 0.33
+    assert round(sum(impulse["emotion_breakdown"].values()), 2) == 1.0
+
+    # emotion_expense_ratio: 전체 지출 거래 2건 중 해당 태그가 붙은 거래 비율, 태그별 독립 집계
+    assert impulse["emotion_expense_ratio"]["스트레스"] == 1.0  # 2건 다 스트레스 태그
+    assert impulse["emotion_expense_ratio"]["즉흥성"] == 0.5  # 1건만 즉흥성 태그
+    assert sum(impulse["emotion_expense_ratio"].values()) > 1.0  # 중복 집계라 100% 초과 가능
+
+
 def test_impulse_warning_notification(client, auth_headers):
     _setup_spending(client, auth_headers)
     notifications = client.get("/notifications", headers=auth_headers).json()

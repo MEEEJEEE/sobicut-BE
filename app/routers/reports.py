@@ -101,6 +101,9 @@ def get_impulse(
     emotion_breakdown = {name: round(v / 100, 2) for name, v in radar.items()}
 
     txs = _month_expense_txs(db, user.id, year, month)
+    coverage = bpti_service.emotion_expense_ratio(txs)
+    emotion_expense_ratio = {name: round(v / 100, 2) for name, v in coverage.items()}
+
     scored = sorted(
         (
             {
@@ -125,6 +128,7 @@ def get_impulse(
         "is_warning": impulse_score >= settings.IMPULSE_WARNING_THRESHOLD * 100,
         "breakdown": breakdown,
         "emotion_breakdown": emotion_breakdown,
+        "emotion_expense_ratio": emotion_expense_ratio,
         "top_impulse_transactions": scored[:5],
         "peer_avg_impulse_score": peer_avg_impulse_score(db, user, year, month),
         "week_over_week": weekly_impulse_comparison(db, user),

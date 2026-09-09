@@ -42,12 +42,27 @@ def emotion_tag_counts(db: Session, user_id: int, year: int, month: int) -> dict
 
 
 def emotion_radar(db: Session, user_id: int, year: int, month: int) -> dict[str, int]:
-    """심리특성별 비율(%) — 5각형 레이더 그래프용"""
+    """심리특성별 비율(%) — 5각형 레이더 그래프용. 태그 부착 횟수 기준 분포라
+    5개 값의 합이 100%다 (한 거래에 여러 태그가 붙으면 그만큼 여러 태그에 나눠 집계)."""
     counts = emotion_tag_counts(db, user_id, year, month)
     total = sum(counts.values())
     if total == 0:
         return {name: 0 for name in EMOTION_NAMES}
     return {name: round(cnt / total * 100) for name, cnt in counts.items()}
+
+
+def emotion_expense_ratio(txs: list[Transaction]) -> dict[str, int]:
+    """태그별 '해당 태그가 붙은 지출 비율'(%) — 이번 달 전체 지출 거래 수 대비, 태그마다
+    독립적으로 집계한다. emotion_radar와 달리 한 거래에 여러 태그가 붙을 수 있어
+    5개 값의 합이 100%를 넘거나 안 될 수 있다 (중복 집계 막대 그래프용)."""
+    if not txs:
+        return {name: 0 for name in EMOTION_NAMES}
+    counts = {name: 0 for name in EMOTION_NAMES}
+    for tx in txs:
+        for name in {t.name for t in tx.emotion_tags}:
+            if name in counts:
+                counts[name] += 1
+    return {name: round(cnt / len(txs) * 100) for name, cnt in counts.items()}
 
 
 def get_bpti(db: Session, user_id: int, year: int, month: int) -> dict | None:
