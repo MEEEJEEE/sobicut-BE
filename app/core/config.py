@@ -24,6 +24,18 @@ class Settings(BaseSettings):
     VAPID_PRIVATE_KEY: str = ""
     VAPID_CLAIMS_EMAIL: str = "admin@sobicut.app"
 
+    # Gemini API (주간 소비 처방 생성)
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.6-flash"
+    # 미분류 거래 카테고리 LLM fallback 전용 모델.
+    # POST /transactions/parse 의 사용자 대기 중 동기 응답 경로에서 쓰이므로
+    # 처방용(GEMINI_MODEL)과 분리해 가볍게/빠르게 교체할 수 있게 둔다.
+    GEMINI_MODEL_CATEGORY: str = "gemini-3.6-flash"
+    # 카테고리 LLM fallback 의 HTTP 요청 timeout(초).
+    # 실측상 정상 응답이 3.0~4.5초 걸려 기존 하드코딩 5.0초는 여유가 부족했다
+    # (지연이 조금만 겹쳐도 실패 → 룰 미매칭 건이 미분류로 떨어짐).
+    GEMINI_CATEGORY_TIMEOUT: float = 10.0
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @property

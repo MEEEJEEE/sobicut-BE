@@ -41,6 +41,17 @@ def setup_db():
     Base.metadata.drop_all(bind=engine)
 
 
+@pytest.fixture(autouse=True)
+def _no_llm_calls(monkeypatch):
+    """테스트 중 실제 Gemini 호출을 전면 차단한다.
+
+    category_matcher.resolve_category() 가 참조하는 심볼
+    (category_matcher 모듈에 bound 된 이름)을 패치한다 — category_llm 쪽이 아니다.
+    LLM 반환값이 필요한 테스트는 각자 monkeypatch 로 다시 덮어쓰면 된다.
+    """
+    monkeypatch.setattr("app.services.category_matcher.classify_category", lambda name: None)
+
+
 @pytest.fixture
 def client():
     return TestClient(app)

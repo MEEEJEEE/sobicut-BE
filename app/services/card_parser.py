@@ -25,6 +25,14 @@ class CardParser:
         (re.compile(r"KB\s*국민(?:카드|체크)?|국민(?:카드|체크)"), "KB국민카드"),
         (re.compile(r"카카오\s*뱅크"), "카카오뱅크"),
         (re.compile(r"NH\s*농협(?:카드)?|농협(?:BC)?(?:카드)?"), "NH농협카드"),
+        # 삼성카드 승인 문자는 "삼성0000승인 ..."처럼 "카드" 없이 접두 4자리만 붙는
+        # 형태가 있다. 정규식을 조이는 대신 리스트 맨 뒤에 두어, 다른 카드사 문자의
+        # 가맹점명에 "삼성####"이 섞여도 그 카드사가 먼저 매칭되도록 한다.
+        (re.compile(r"삼성(?=\d{4})"), "삼성카드"),
+        # 우리카드도 "우리(0479)승인 ..."처럼 "카드" 없이 온다. "우리"만으로 매칭하면
+        # "우리동네마트" 같은 상호를 오인식하므로 뒤따르는 문맥(이용안내 / 괄호+숫자)을
+        # 조건으로 두고, 삼성 분기와 마찬가지로 리스트 맨 뒤에 둔다.
+        (re.compile(r"우리(?:카드)?(?=\s*이용안내)|우리(?=\([\d*]{2,}\))"), "우리카드"),
     ]
 
     _CUMULATIVE_RE = re.compile(r"(누적|잔액)[:\s]*[\d,\-금액]*원?")
@@ -32,12 +40,23 @@ class CardParser:
     _ISO_DATE_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
     _SHORT_DATE_RE = re.compile(r"(\d{2})/(\d{2})")
     _TIME_RE = re.compile(r"([01]\d|2[0-3]):([0-5]\d)")
-    _MASK_NAME_RE = re.compile(r"[가-힣*]{2,4}(?:님|(?=[\(（][\d*]{2,}[\)）]))")
+    # "홍*동" 처럼 마스킹된 이름: (1) "님"이 붙거나 (2) 뒤에 "(1234)" 코드가 오거나
+    # (3) '*'를 포함한 채 공백/줄바꿈/문자열 끝 앞에 놓인 경우. (3)은 마스킹의
+    # 특징인 '*' 포함을 필수로 요구해, 줄 끝의 실제 2~4자 상호명은 건드리지 않는다.
+    _MASK_NAME_RE = re.compile(
+        r"[가-힣*]{2,4}(?:님|(?=[\(（][\d*]{2,}[\)）]))"
+        r"|(?=[가-힣]*\*)[가-힣*]{2,4}(?=\s|$)"
+    )
     _MASK_CODE_RE = re.compile(r"[\d*]{2,}")
     _NOISE_WORDS_RE = re.compile(
-        r"\[Web발신\]|\(Web발신\)|체크카드출금|체크\.승인|승인시각|승인|일시불|"
-        r"출금|계좌|고객명|시각"
+        r"\[Web발신\]|\(Web발신\)|체크카드출금|체크\.?승인|승인시각|승인|일시불|"
+        r"카드번호입력|자동결제|이용안내|금액|출금|계좌|고객명|시각|"
+        # 문자 앞머리 장식 기호(줄 맨 앞의 •, ·, ▶ 등). 상호명 중간의 가운뎃점을
+        # 지우지 않도록 줄머리에서만 제거한다.
+        r"(?:^|(?<=\n))[ \t]*[•·∙‣▪◦▶►▸▷▹※]+"
     )
+    # 노이즈·마스킹 토큰 제거 후 내용 없이 남는 괄호/대괄호 (안이 공백뿐인 경우 포함).
+    _EMPTY_BRACKET_RE = re.compile(r"\(\s*\)|（\s*）|\[\s*\]|［\s*］")
     _COMPANY_SUFFIX_RE = re.compile(r"\(주\)|주식회사")
 
     def parse(self, message_text: str) -> dict:
@@ -117,20 +136,30 @@ class CardParser:
         # 대괄호 형식이 아니면, 인식된 토큰을 모두 제거하고 남는 텍스트를 가맹점으로 본다.
         cleaned = text
         cleaned = self._CUMULATIVE_RE.sub(" ", cleaned)
-        cleaned = self._NOISE_WORDS_RE.sub(" ", cleaned)
-        cleaned = self._COMPANY_SUFFIX_RE.sub(" ", cleaned)
-        cleaned = self._MASK_NAME_RE.sub(" ", cleaned)
+        # 카드사명은 노이즈 제거보다 먼저 지운다. 삼성/우리 분기는 "승인"·"이용안내"
+        # 같은 뒤따르는 문맥을 룩어헤드로 요구하는데, 노이즈 제거가 먼저 돌면 그
+        # 문맥이 사라져 카드사명이 가맹점명에 잔류한다.
         for pattern, _name in self._COMPANY_PATTERNS:
             cleaned = pattern.sub(" ", cleaned)
+        cleaned = self._NOISE_WORDS_RE.sub(" ", cleaned)
+        # 빈 문자열로 치환한다. " "로 치우면 "롯데쇼핑(주)강남점"이 "롯데쇼핑 강남점"으로
+        # 쪼개져 가맹점 사전 매칭(특히 prefix)이 실패한다. "(주)"는 항상 상호명 내부에만
+        # 등장하므로 서로 다른 토큰이 붙을 위험이 없다.
+        cleaned = self._COMPANY_SUFFIX_RE.sub("", cleaned)
+        cleaned = self._MASK_NAME_RE.sub(" ", cleaned)
         cleaned = self._ISO_DATE_RE.sub(" ", cleaned)
         cleaned = self._SHORT_DATE_RE.sub(" ", cleaned)
         cleaned = self._TIME_RE.sub(" ", cleaned)
         cleaned = self._MONEY_RE.sub(" ", cleaned)
         cleaned = self._MASK_CODE_RE.sub(" ", cleaned)  # 마스킹된 카드번호/전화번호 등
         # 노이즈 제거 후 속이 빈 괄호만 지운다. "(CU)"처럼 실제 상호명 일부인
-        # 괄호는 안이 채워져 있으므로 남긴다.
-        cleaned = re.sub(r"[\(（]\s*[\)）]|\[\s*\]", " ", cleaned)
-        cleaned = re.sub(r"[.:,\-]+", " ", cleaned)
+        # 괄호는 안이 채워져 있으므로 남긴다. 토큰이 빠지며 남은 "[ ]", "( )"도 정리한다.
+        cleaned = self._EMPTY_BRACKET_RE.sub(" ", cleaned)
+        # 구분자로 쓰인 구두점만 공백으로 바꾸고, 영숫자 사이의 "."은 남긴다.
+        # ("SSG.COM" 같은 도메인/영문 상호가 "SSG COM"으로 갈라지는 것을 막는다.)
+        cleaned = re.sub(
+            r"(?<![A-Za-z0-9])[.:,\-]+|[.:,\-]+(?![A-Za-z0-9])", " ", cleaned
+        )
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         cleaned = re.sub(r"\s*(사용|취소)$", "", cleaned).strip()
 
