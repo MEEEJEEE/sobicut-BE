@@ -73,7 +73,7 @@ def process_weekly_prescriptions(db: Session) -> int:
                 period_type=PERIOD_TYPE,
                 period_start=last_monday,
                 content=prescriptions,
-                model_name=settings.GEMINI_MODEL,
+                model_name=settings.CLAUDE_MODEL,
             )
         )
         saved += 1

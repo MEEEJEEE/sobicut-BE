@@ -23,7 +23,7 @@ class LlmPrescription(Base):
     period_type: Mapped[str] = mapped_column(String(20), nullable=False)  # 예: "weekly"
     period_start: Mapped[date] = mapped_column(Date, nullable=False)
     content: Mapped[list] = mapped_column(JSON, nullable=False)  # 처방 3개 배열
-    model_name: Mapped[str | None] = mapped_column(String(50), nullable=True)  # 예: "gemini-2.5-flash"
+    model_name: Mapped[str | None] = mapped_column(String(50), nullable=True)  # 예: "claude-haiku-4.5"
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
     user = relationship("User")
