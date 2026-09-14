@@ -18,11 +18,18 @@ PUSH_NOTIFICATION_TYPE = "가계부기록도우미"
 NOTIFICATION_TYPE = "no_transaction_reminder"
 
 
-def process_no_transaction_reminders(db: Session) -> int:
-    """오늘 거래 기록이 없는 사용자에게 알림을 보낸다. 발송 건수를 반환한다."""
+def process_no_transaction_reminders(db: Session, user_id: int | None = None, *, force: bool = False) -> int:
+    """오늘 거래 기록이 없는 사용자에게 알림을 보낸다. 발송 건수를 반환한다.
+
+    user_id: 지정하면 그 유저만 대상으로 함 (발표/데모 수동 트리거용).
+    force: True면 당일 중복 발송 방지 체크를 건너뜀 (데모 중 반복 트리거용). 스케줄러는 항상 기본값(False) 사용.
+    """
     today = date.today()
     sent = 0
-    users = db.query(User).filter(User.deleted_at.is_(None)).all()
+    query = db.query(User).filter(User.deleted_at.is_(None))
+    if user_id is not None:
+        query = query.filter(User.id == user_id)
+    users = query.all()
     for user in users:
         has_tx_today = (
             db.query(Transaction)
@@ -42,7 +49,7 @@ def process_no_transaction_reminders(db: Session) -> int:
             )
             .first()
         )
-        if already_sent:
+        if not force and already_sent:
             continue
 
         title = "오늘의 소비, 아직 기록하지 않았어요"

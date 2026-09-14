@@ -1170,6 +1170,51 @@ Response:
 
 ---
 
+## 10.5 Demo Triggers (발표/시연용)
+
+알림 배치(요일컷/시간대컷/가계부 기록 도우미/만족도 조사/월간 예산 보너스)는 원래
+APScheduler 스케줄(매일 특정 시각)로만 실행된다. 발표 시연 중에 그 시각까지 기다릴
+수 없으므로, 로그인한 계정 기준으로 배치를 즉시 1회 실행시켜주는 엔드포인트를
+추가했다. **알림이 뜨는 조건 자체(이번 달 피크 요일/시간대인지, 오늘 거래가
+없는지 등)는 그대로 적용되므로, 시연 전에 그 조건에 맞는 데이터를 미리 준비해야
+한다** — 이 엔드포인트가 조건 없이 무조건 알림을 만들어주는 건 아니다.
+
+| 엔드포인트 | 대응 실제 스케줄 | 발동 조건 |
+|---|---|---|
+| `POST /demo/trigger/heatmap-day` | 매일 09:10 KST | 오늘이 이번 달 소비 최다 요일 |
+| `POST /demo/trigger/heatmap-time` | 매일 06/11/14/19/23시 KST | 지금이 이번 달 소비 최다 시간대 |
+| `POST /demo/trigger/no-transaction-reminder` | 매일 22:00 KST | 오늘 등록된 거래가 하나도 없음 |
+| `POST /demo/trigger/satisfaction-reminder` | 매일 21:00 KST | 고가 소비 후 1일/7일/30일째가 정확히 오늘 |
+| `POST /demo/trigger/budget-bonus` | 매일 09:05 KST (매월 1일에만 실제 지급) | 지난달 예산 초과 없이 마감 |
+
+Query Parameter (공통):
+- `force` (bool, 기본 `false`): `true`로 주면 "오늘 이미 보냈음" 같은 중복 방지 체크를
+  건너뛰고 다시 보낸다. 리허설 후 실제 발표에서 또 보여줘야 할 때 사용. `budget-bonus`는
+  추가로 "매월 1일에만 동작" 제한도 같이 풀린다(지난달 예산 준수 여부 자체는 그대로 실제
+  데이터로 판정).
+
+Response 예시 (`heatmap-day`/`heatmap-time`/`no-transaction-reminder`/`satisfaction-reminder`):
+```json
+{ "sent": 1 }
+```
+
+Response 예시 (`budget-bonus`):
+```json
+{ "granted": 1 }
+```
+
+**사용 방법**: 로그인한 토큰으로 호출하면 그 계정에게만 적용된다(다른 유저에게는 영향 없음).
+`/docs`(Swagger UI)에서 로그인 토큰으로 Authorize 해두고 각 엔드포인트를 "Try it out"으로
+바로 눌러서 시연하면 별도 도구 없이 그 자리에서 알림이 뜨는 걸 보여줄 수 있다.
+
+예시 시나리오 (히트맵 요일컷 시연):
+1. 시연 계정으로 이번 달에 아직 거래를 하나도 안 만들었다면, 오늘 날짜로 거래 1건 등록
+   (이번 달 유일한 지출이 되어 자동으로 "오늘"이 최다 소비 요일이 됨)
+2. `POST /demo/trigger/heatmap-day` 호출 → 알림 발생 확인 (`GET /notifications`)
+3. 리허설에서 이미 한 번 보여줬다면, 실제 발표 때는 `?force=true`를 붙여서 다시 호출
+
+---
+
 ## 11. Notes
 
 - 모든 엔드포인트는 JWT 인증 필요 (`Authorization: Bearer <token>`)

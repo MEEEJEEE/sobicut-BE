@@ -22,10 +22,15 @@ _TITLES = {
 }
 
 
-def process_satisfaction_reminders(db: Session) -> int:
-    """오늘 마감인 만족도 조사 대상에 알림을 발송한다. 발송 건수를 반환한다."""
+def process_satisfaction_reminders(db: Session, user_id: int | None = None, *, force: bool = False) -> int:
+    """오늘 마감인 만족도 조사 대상에 알림을 발송한다. 발송 건수를 반환한다.
+
+    user_id: 지정하면 그 유저만 대상으로 함 (발표/데모 수동 트리거용).
+    force: True면 중복 발송 방지 로그를 무시하고 다시 보냄 (데모 중 반복 트리거용).
+    기존 로그가 있으면 지우고 새로 남긴다(유니크 제약 때문). 스케줄러는 항상 기본값(False) 사용.
+    """
     sent = 0
-    for tx, day_type, _due in due_satisfaction_targets(db, due_today_only=True):
+    for tx, day_type, _due in due_satisfaction_targets(db, user_id=user_id, due_today_only=True):
         already_sent = (
             db.query(SatisfactionNotificationLog)
             .filter(
@@ -35,7 +40,10 @@ def process_satisfaction_reminders(db: Session) -> int:
             .first()
         )
         if already_sent:
-            continue
+            if not force:
+                continue
+            db.delete(already_sent)
+            db.flush()
 
         title = _TITLES[day_type]
         message = f"{tx.merchant or '해당 소비'} {tx.amount:,}원, 만족도를 알려주세요."

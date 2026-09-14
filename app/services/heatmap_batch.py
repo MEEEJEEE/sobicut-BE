@@ -35,19 +35,26 @@ def _already_sent_today(db: Session, user_id: int, notif_type: str, today: date)
     )
 
 
-def process_heatmap_day_alerts(db: Session) -> int:
-    """오늘이 이번 달 소비가 가장 많은 요일이면 알림 (매일 1회 체크)."""
+def process_heatmap_day_alerts(db: Session, user_id: int | None = None, *, force: bool = False) -> int:
+    """오늘이 이번 달 소비가 가장 많은 요일이면 알림 (매일 1회 체크).
+
+    user_id: 지정하면 그 유저만 대상으로 함 (발표/데모 수동 트리거용).
+    force: True면 당일 중복 발송 방지 체크를 건너뜀 (데모 중 반복 트리거용). 스케줄러는 항상 기본값(False) 사용.
+    """
     today = date.today()
     today_name = DAY_NAMES[today.weekday()]
 
     sent = 0
-    users = db.query(User).filter(User.deleted_at.is_(None)).all()
+    query = db.query(User).filter(User.deleted_at.is_(None))
+    if user_id is not None:
+        query = query.filter(User.id == user_id)
+    users = query.all()
     for user in users:
         report = report_service.heatmap_report(db, user.id, today.year, today.month)
         peak_day = report.get("peak_day")
         if not peak_day or peak_day["day"] != today_name:
             continue
-        if _already_sent_today(db, user.id, "heatmap_day", today):
+        if not force and _already_sent_today(db, user.id, "heatmap_day", today):
             continue
 
         title = peak_day["message"]  # 예: "목요일에 소비가 가장 많아요"
@@ -61,19 +68,26 @@ def process_heatmap_day_alerts(db: Session) -> int:
     return sent
 
 
-def process_heatmap_time_alerts(db: Session) -> int:
-    """지금이 이번 달 소비가 가장 많은 시간대면 알림 (매일 06/11/14/19/23시 경계마다 체크)."""
+def process_heatmap_time_alerts(db: Session, user_id: int | None = None, *, force: bool = False) -> int:
+    """지금이 이번 달 소비가 가장 많은 시간대면 알림 (매일 06/11/14/19/23시 경계마다 체크).
+
+    user_id: 지정하면 그 유저만 대상으로 함 (발표/데모 수동 트리거용).
+    force: True면 당일 중복 발송 방지 체크를 건너뜀 (데모 중 반복 트리거용). 스케줄러는 항상 기본값(False) 사용.
+    """
     now = datetime.now()
     current_slot = get_time_slot(now.time())
 
     sent = 0
-    users = db.query(User).filter(User.deleted_at.is_(None)).all()
+    query = db.query(User).filter(User.deleted_at.is_(None))
+    if user_id is not None:
+        query = query.filter(User.id == user_id)
+    users = query.all()
     for user in users:
         report = report_service.heatmap_report(db, user.id, now.year, now.month)
         peak_slot = report.get("peak_time_slot")
         if not peak_slot or peak_slot["time_slot"] != current_slot:
             continue
-        if _already_sent_today(db, user.id, "heatmap_time", now.date()):
+        if not force and _already_sent_today(db, user.id, "heatmap_time", now.date()):
             continue
 
         title = peak_slot["label"]  # 예: "야간 야망 컷"
