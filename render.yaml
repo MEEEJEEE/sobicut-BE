@@ -1,0 +1,40 @@
+# Render Blueprint — Dashboard > New > Blueprint 에서 이 저장소를 선택하면
+# 아래 DB + 웹 서비스가 한 번에 만들어진다. (sync: false 인 값은 생성 화면에서 직접 입력)
+databases:
+  - name: sobicut-db
+    region: singapore
+    plan: basic-256mb
+    databaseName: sobicut
+    user: sobicut
+    ipAllowList: []  # 외부 접속 차단, 같은 Render 안의 서비스에서만 접근
+
+services:
+  - type: web
+    name: sobicut-api
+    runtime: python
+    region: singapore  # DB와 같은 리전이어야 내부 URL로 연결됨
+    plan: starter  # 무료 플랜은 15분 무요청 시 꺼져서 스케줄러(알림 배치)가 안 돈다
+    buildCommand: pip install -r requirements.txt
+    # 스케줄러가 서버 프로세스 안에서 돌기 때문에 --workers 옵션 금지 (알림 중복 발송)
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sobicut-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      # Render 서버는 UTC라서 지정하지 않으면 배치의 "오늘"/시간대 판정이 9시간 어긋난다
+      - key: TZ
+        value: Asia/Seoul
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: CORS_ORIGINS
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
