@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.scheduler import init_scheduler, shutdown_scheduler
@@ -26,11 +27,19 @@ async def lifespan(app: FastAPI):
     shutdown_scheduler()
 
 
+class UTF8JSONResponse(JSONResponse):
+    """Content-Type에 charset=utf-8을 명시해, 응답 헤더만 보고 인코딩을
+    잘못 추측하는 일부 브라우저/뷰어에서 한글이 깨져 보이는 문제를 방지한다."""
+
+    media_type = "application/json; charset=utf-8"
+
+
 app = FastAPI(
     title="소비컷 (Sobicut) API",
     description="감정 기반 소비 분석으로 충동 소비를 줄이는 대학생 맞춤형 스마트 가계부",
     version="2.0.0",
     lifespan=lifespan,
+    default_response_class=UTF8JSONResponse,
 )
 
 app.add_middleware(
