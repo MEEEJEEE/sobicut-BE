@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import Budget, Satisfaction, Transaction, User
+from app.services.common import get_iso_week_range
 
 WEIGHTS_PATH = Path(__file__).parent / "weights.json"
 WEIGHTS = json.loads(WEIGHTS_PATH.read_text(encoding="utf-8"))
@@ -193,7 +194,7 @@ def peer_avg_impulse_score(db: Session, user: User, year: int, month: int) -> in
 
 
 def weekly_impulse_comparison(db: Session, user: User) -> dict:
-    """이번 주 vs 지난주 평균 충동 점수 (오늘 기준 최근 7일 롤링 윈도우)"""
+    """이번 주 vs 지난주 평균 충동 점수 (월~일 기준 캘린더 주 — 예산 주차/주간 리포트와 동일 정의)"""
 
     def _avg_for_range(start: date, end: date) -> int | None:
         txs = (
@@ -210,12 +211,10 @@ def weekly_impulse_comparison(db: Session, user: User) -> dict:
             return None
         return round(sum(transaction_impulse_score(db, tx, user) for tx in txs) / len(txs))
 
-    today = date.today()
-    this_week_start = today - timedelta(days=6)
-    last_week_end = this_week_start - timedelta(days=1)
-    last_week_start = last_week_end - timedelta(days=6)
+    this_week_start, this_week_end = get_iso_week_range(date.today())
+    last_week_start, last_week_end = get_iso_week_range(this_week_start - timedelta(days=7))
 
-    this_week = _avg_for_range(this_week_start, today)
+    this_week = _avg_for_range(this_week_start, this_week_end)
     last_week = _avg_for_range(last_week_start, last_week_end)
     diff = (this_week - last_week) if (this_week is not None and last_week is not None) else None
 

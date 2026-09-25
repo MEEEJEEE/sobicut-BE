@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Budget, Notification, Transaction, User
 from app.services import level as level_service
-from app.services.common import get_week_of_month
+from app.services.common import get_iso_week_range, get_week_of_month
 from app.services.impulse import monthly_avg_impulse_score, monthly_spent, transaction_impulse_score
 from app.services.web_push import notify_active_subscribers
 
@@ -55,12 +55,11 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
                     db, user.id, PUSH_NOTIFICATION_TYPE, title, message, notification_type="budget_monthly"
                 )
 
-        # 주간 예산 초과 (해당 주차 예산 기준)
+        # 주간 예산 초과 (해당 주차 예산 기준, 월~일 캘린더 주)
         week = get_week_of_month(d)
         week_budget = getattr(budget, f"week_{week}_budget", 0) or budget.weekly_budget
         if week_budget > 0:
-            week_start_day = (week - 1) * 7 + 1
-            week_start = d.replace(day=week_start_day)
+            week_start, _ = get_iso_week_range(d)
             week_spent = (
                 db.query(func.coalesce(func.sum(Transaction.amount), 0))
                 .filter(

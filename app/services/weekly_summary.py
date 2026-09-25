@@ -1,29 +1,24 @@
 """LLM 소비 처방 생성에 넣을 주간 소비 요약 데이터 구성 모듈.
 
-주(week) 정의: ISO 주 — 월요일 시작 ~ 일요일 종료.
-레포 기존의 `app.services.common.get_week_of_month`(매월 1·8·15·22일 기준의
-월 내 1~4주차)와는 정의가 다르므로 이 모듈에서는 그 함수를 쓰지 않는다.
+주(week) 정의: ISO 주 — 월요일 시작 ~ 일요일 종료. `app.services.common.get_week_of_month`
+(월 내 1~4주차)도 이제 같은 월~일 기준이라 두 모듈의 "주" 정의는 일치한다.
 
 거래 조회 방식은 `app.services.report._month_expenses` / `category_report`,
 `app.services.bpti.emotion_tag_counts`의 패턴을 그대로 따르되, 연/월 필터를
 날짜 범위(월요일~일요일) 필터로 바꾼 버전을 사용한다.
 """
-from datetime import date, timedelta
+from datetime import date
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import EmotionTag, Transaction, TransactionEmotion, User
 from app.services.bpti import EMOTION_NAMES
+from app.services.common import get_iso_week_range
 from app.services.impulse import transaction_impulse_score
 from app.services.report import CATEGORIES
 
-
-def get_iso_week_range(d: date) -> tuple[date, date]:
-    """`d`가 속한 ISO 주의 (월요일, 일요일)을 반환한다. `d.weekday()`는 월=0."""
-    monday = d - timedelta(days=d.weekday())
-    sunday = monday + timedelta(days=6)
-    return monday, sunday
+__all__ = ["get_iso_week_range", "build_weekly_summary"]
 
 
 def _week_expenses(db: Session, user_id: int, week_start: date, week_end: date) -> list[Transaction]:
