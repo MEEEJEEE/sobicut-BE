@@ -20,6 +20,7 @@ from app.models import User
 from app.services.heatmap_batch import process_heatmap_day_alerts, process_heatmap_time_alerts
 from app.services.level_batch import process_monthly_budget_bonus
 from app.services.no_transaction_batch import process_no_transaction_reminders
+from app.services.prescription_batch import process_weekly_prescriptions
 from app.services.satisfaction_batch import process_satisfaction_reminders
 
 router = APIRouter(prefix="/demo/trigger", tags=["Demo Triggers"])
@@ -68,3 +69,12 @@ def trigger_budget_bonus(
     db: Session = Depends(get_db),
 ):
     return {"granted": process_monthly_budget_bonus(db, user_id=user.id, force=force)}
+
+
+@router.post("/weekly-prescription")
+def trigger_weekly_prescription(
+    force: bool = False,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return {"saved": process_weekly_prescriptions(db, user_id=user.id, force=force)}

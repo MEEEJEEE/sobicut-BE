@@ -1186,12 +1186,14 @@ APScheduler 스케줄(매일 특정 시각)로만 실행된다. 발표 시연 �
 | `POST /demo/trigger/no-transaction-reminder` | 매일 22:00 KST | 오늘 등록된 거래가 하나도 없음 |
 | `POST /demo/trigger/satisfaction-reminder` | 매일 21:00 KST | 고가 소비 후 1일/7일/30일째가 정확히 오늘 |
 | `POST /demo/trigger/budget-bonus` | 매일 09:05 KST (매월 1일에만 실제 지급) | 지난달 예산 초과 없이 마감 |
+| `POST /demo/trigger/weekly-prescription` | 매주 월요일 04:00 KST | 막 끝난 지난주에 거래·팩터가 있어야 함 (LLM 호출) |
 
 Query Parameter (공통):
 - `force` (bool, 기본 `false`): `true`로 주면 "오늘 이미 보냈음" 같은 중복 방지 체크를
   건너뛰고 다시 보낸다. 리허설 후 실제 발표에서 또 보여줘야 할 때 사용. `budget-bonus`는
   추가로 "매월 1일에만 동작" 제한도 같이 풀린다(지난달 예산 준수 여부 자체는 그대로 실제
-  데이터로 판정).
+  데이터로 판정). `weekly-prescription`은 이미 생성된 지난주 처방이 있으면 지우고 LLM을
+  다시 호출해 새로 생성한다(쿼터를 쓰므로 꼭 필요할 때만 `force=true` 사용).
 
 Response 예시 (`heatmap-day`/`heatmap-time`/`no-transaction-reminder`/`satisfaction-reminder`):
 ```json
@@ -1202,6 +1204,13 @@ Response 예시 (`budget-bonus`):
 ```json
 { "granted": 1 }
 ```
+
+Response 예시 (`weekly-prescription`):
+```json
+{ "saved": 1 }
+```
+`saved`가 `0`이면 막 끝난 지난주에 거래가 없었거나(팩터 없음) 이미 생성돼 있는 상태(force
+미지정)다. `GET /reports/prescription`으로 결과를 바로 확인할 수 있다.
 
 **사용 방법**: 로그인한 토큰으로 호출하면 그 계정에게만 적용된다(다른 유저에게는 영향 없음).
 `/docs`(Swagger UI)에서 로그인 토큰으로 Authorize 해두고 각 엔드포인트를 "Try it out"으로

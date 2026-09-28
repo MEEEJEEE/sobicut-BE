@@ -30,13 +30,22 @@ PERIOD_TYPE = "weekly"
 REQUEST_INTERVAL_SECONDS = 2
 
 
-def process_weekly_prescriptions(db: Session) -> int:
-    """막 끝난 지난주 기준으로 유저별 주간 처방을 생성·저장한다. 저장 건수를 반환한다."""
+def process_weekly_prescriptions(db: Session, user_id: int | None = None, *, force: bool = False) -> int:
+    """막 끝난 지난주 기준으로 유저별 주간 처방을 생성·저장한다. 저장 건수를 반환한다.
+
+    user_id: 지정하면 그 유저만 대상으로 함 (발표/데모 수동 트리거용).
+    force: True면 이미 생성된 처방이 있어도 지우고 다시 생성한다 (데모 중 재시연용).
+    거래/팩터가 없어 LLM을 호출하지 않는 스킵 조건은 그대로 적용된다 — force가
+    없는 데이터를 만들어주지는 않는다. 스케줄러는 항상 기본값(user_id=None, force=False) 사용.
+    """
     last_monday = get_iso_week_range(date.today())[0] - timedelta(days=7)
     prev_monday = last_monday - timedelta(days=7)
 
     saved = 0
-    users = db.query(User).filter(User.deleted_at.is_(None)).all()
+    query = db.query(User).filter(User.deleted_at.is_(None))
+    if user_id is not None:
+        query = query.filter(User.id == user_id)
+    users = query.all()
     for user in users:
         already = (
             db.query(LlmPrescription)
@@ -48,7 +57,10 @@ def process_weekly_prescriptions(db: Session) -> int:
             .first()
         )
         if already is not None:
-            continue
+            if not force:
+                continue
+            db.delete(already)
+            db.flush()
 
         summary = build_weekly_summary(db, user, last_monday)
         if summary["transaction_count"] == 0:
