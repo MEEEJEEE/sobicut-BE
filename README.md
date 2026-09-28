@@ -192,7 +192,11 @@ MBTI처럼 소비 유형 제공
 
 ### Frontend
 
-* (추후 작성: React / Flutter 등)
+* React (Vercel 배포)
+
+### Infra
+
+* Render (Web Service + PostgreSQL, Singapore 리전)
 
 ---
 
@@ -286,6 +290,24 @@ uvicorn app.main:app --reload
 ```bash
 pytest
 ```
+
+---
+
+## 🌐 배포
+
+* **API 서버**: https://sobicut-be.onrender.com ([Swagger UI](https://sobicut-be.onrender.com/docs))
+* Render Web Service(Starter) + PostgreSQL(Basic-256mb), Singapore 리전
+* `render.yaml`에 배포 구성이 정의되어 있음(DB/서버 리전, 시작 명령, 필수 환경변수 목록).
+  다만 실제 배포는 Blueprint 자동화 대신 Render 대시보드에서 리소스를 개별 생성했으므로,
+  `render.yaml`은 참고용 스펙 문서에 가깝다.
+* 필수 환경변수: `DATABASE_URL`, `SECRET_KEY`, `TZ=Asia/Seoul`, `CORS_ORIGINS`,
+  `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, `ANTHROPIC_API_KEY`, `PYTHON_VERSION=3.11.9`
+  (Render 기본값인 최신 Python은 `pydantic-core` 소스 빌드가 실패해 반드시 고정해야 함)
+* `TZ=Asia/Seoul`을 빼먹으면 서버가 UTC로 동작해 히트맵·알림 배치의 "오늘/현재 시간대"
+  판정이 실제와 9시간 어긋난다.
+* 배포 시작 명령: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+  (스케줄러가 프로세스 안에서 함께 도는 구조라 `--workers`로 여러 개 띄우면 알림이 중복 발송됨)
+* `CORS_ORIGINS`에 프론트 배포 주소(Vercel)가 등록되어 있어야 브라우저에서 API 호출이 통과됨.
 
 ---
 
