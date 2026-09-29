@@ -1,3 +1,6 @@
+from datetime import date
+
+
 def test_my_page(client, auth_headers):
     me = client.get("/users/me", headers=auth_headers).json()
     assert me["nickname"] == "미지"
@@ -38,7 +41,7 @@ def test_password_change(client, auth_headers):
     assert res.status_code == 200
 
 
-def _setup_spending(client, auth_headers):
+def _setup_spending(client, auth_headers, transaction_date="2026-07-05"):
     client.put(
         "/budget",
         json={
@@ -59,7 +62,7 @@ def _setup_spending(client, auth_headers):
             "category": "쇼핑/패션",
             "merchant": "쿠팡",
             "description": None,
-            "transaction_date": "2026-07-05",
+            "transaction_date": transaction_date,
             "transaction_time": "02:30",
         },
         headers=auth_headers,
@@ -150,10 +153,12 @@ def test_emotion_expense_ratio_is_independent_per_tag_unlike_breakdown(client, a
 
 
 def test_impulse_warning_notification(client, auth_headers):
-    _setup_spending(client, auth_headers)
+    # check_after_transaction은 이번 달/주 거래만 예산 초과 알림을 검사하므로 오늘 날짜를 쓴다
+    # (_setup_spending 기본값 2026-07-05는 test_reports가 year=2026&month=7로 고정 검증하는 값이라 그대로 둔다)
+    _setup_spending(client, auth_headers, transaction_date=date.today().isoformat())
     notifications = client.get("/notifications", headers=auth_headers).json()
     types = {n["type"] for n in notifications}
-    assert "budget_weekly" in types  # 1주차 예산 125000 < 150000
+    assert "budget_weekly" in types  # 예산(125000) < 지출(150000)
 
     # 읽음 처리
     if notifications:

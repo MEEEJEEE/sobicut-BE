@@ -41,10 +41,17 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
 
     budget = db.query(Budget).filter(Budget.user_id == user.id).first()
     d = tx.transaction_date
+    today = date.today()
+    # Budget은 유저당 단일 행이라 "그 달/그 주의 예산"이라는 개념 자체가 없고
+    # 항상 "지금 설정된" 값 하나뿐이다. 과거·미래 날짜로 등록된 거래까지 이
+    # 값과 비교해 "이번 달/이번 주 예산 초과"라고 알리면 실제로는 다른 달의
+    # 지출을 지금 예산과 잘못 비교한 오탐이 된다 — 문구가 뜻하는 기간(오늘이
+    # 속한 달/주)에 실제로 속한 거래일 때만 아래 알림들을 검사한다.
+    is_current_month = d.year == today.year and d.month == today.month
 
     if budget:
         # 월간 예산 초과
-        if budget.monthly_budget > 0:
+        if is_current_month and budget.monthly_budget > 0:
             spent = monthly_spent(db, user.id, d.year, d.month)
             if spent > budget.monthly_budget and not _exists_this_period(
                 db, user.id, "budget_monthly", d.replace(day=1)
@@ -56,10 +63,11 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
                 )
 
         # 주간 예산 초과 (해당 주차 예산 기준, 월~일 캘린더 주)
+        week_start, week_end = get_iso_week_range(d)
+        is_current_week = week_start <= today <= week_end
         week = get_week_of_month(d)
         week_budget = getattr(budget, f"week_{week}_budget", 0) or budget.weekly_budget
-        if week_budget > 0:
-            week_start, _ = get_iso_week_range(d)
+        if is_current_week and week_budget > 0:
             week_spent = (
                 db.query(func.coalesce(func.sum(Transaction.amount), 0))
                 .filter(
@@ -83,7 +91,10 @@ def check_after_transaction(db: Session, user: User, tx: Transaction) -> None:
     # 값이라 건별로 되돌려주는 게 정보값이 낮고, 태그 1~2개만 있어도 거의 매 거래마다
     # 떠서 알림이 남발되는 문제가 있었음. 메인/리포트에 보이는 "이번 달 평균 충동 지수"가
     # 새 임계값(75/90/99)을 넘을 때만, 그것도 이번 달에 아직 그 단계를 안 알렸을 때만 발송)
-    _check_monthly_impulse_trend(db, user, tx)
+    # 과거/미래 달 거래는 위 예산 알림과 같은 이유로 건너뛴다 — "이번 달 충동 지수"라는
+    # 문구가 실제로 맞는, 오늘이 속한 달의 거래일 때만 검사한다.
+    if is_current_month:
+        _check_monthly_impulse_trend(db, user, tx)
 
     score = transaction_impulse_score(db, tx, user)
     if score < level_service.LOW_IMPULSE_THRESHOLD and not tx.low_impulse_bonus_granted:

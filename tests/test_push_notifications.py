@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from pywebpush import WebPushException
 
@@ -155,7 +156,7 @@ def test_budget_exceeded_transaction_triggers_push(client, auth_headers, monkeyp
             "type": "expense",
             "category": "쇼핑/패션",
             "merchant": "쿠팡",
-            "transaction_date": "2026-07-05",
+            "transaction_date": date.today().isoformat(),  # check_after_transaction은 이번 달/주 거래만 알린다
             "transaction_time": "02:30",
         },
         headers=auth_headers,
@@ -171,13 +172,64 @@ def test_budget_exceeded_transaction_triggers_push(client, auth_headers, monkeyp
     assert "transaction_id" not in budget_payload  # 특정 거래 알림이 아니므로 없어야 함
 
 
-def _setup_max_single_tx_impulse(client, auth_headers, tx_date="2026-08-25"):
+def test_backdated_transaction_does_not_trigger_current_period_alerts(client, auth_headers, monkeypatch):
+    """Budget은 유저당 단일 행이라 "그 달/그 주의 예산"이 따로 없고 항상 지금 값뿐이다.
+
+    과거 달 거래를 등록해 지금 예산을 초과시켜도, 문구가 "이번 달"/"이번 주"인
+    budget_monthly·budget_weekly·impulse_monthly_trend 알림은 뜨면 안 된다 —
+    지금 예산은 그 과거 달의 실제 예산이 아니므로 비교 자체가 근거가 없다.
+    """
+    calls = []
+    monkeypatch.setattr(web_push_service, "webpush", lambda **kwargs: calls.append(kwargs))
+    client.post("/notifications/subscribe", json=SUBSCRIBE_BODY, headers=auth_headers)
+    client.put(
+        "/budget",
+        json={
+            "monthly_budget": 100000, "weekly_budget": 25000,
+            "weekly_budgets": {"week_1": 25000, "week_2": 25000, "week_3": 25000, "week_4": 25000},
+        },
+        headers=auth_headers,
+    )
+
+    # 표준 라이브러리만으로 "3개월 전" 계산 (day=5로 고정해 월말 롤오버 문제 회피)
+    y, m = date.today().year, date.today().month - 3
+    while m <= 0:
+        m += 12
+        y -= 1
+    past_date = date(y, m, 5)
+
+    res = client.post(
+        "/transactions",
+        json={
+            "amount": 150000, "type": "expense", "category": "쇼핑/패션", "merchant": "과거지출",
+            "transaction_date": past_date.isoformat(), "transaction_time": "03:00",
+        },
+        headers=auth_headers,
+    )
+    assert res.status_code == 201
+
+    assert calls == []  # 웹 푸시 자체가 안 나감
+
+    notifications = client.get("/notifications", headers=auth_headers).json()
+    types = {n["type"] for n in notifications}
+    assert "budget_monthly" not in types
+    assert "budget_weekly" not in types
+    assert "impulse_monthly_trend" not in types
+
+
+def _setup_max_single_tx_impulse(client, auth_headers, tx_date=None):
     """단건 거래로 충동 지수를 약 75점(z=0.14+0.54+0.42=1.10)까지 끌어올리는 공통 셋업.
 
     이상시간대(새벽 03시, 0.14) + 금액부담(예산 대비 90% 이상, 0.54) +
     또래대비소비(또래 지출 0이라 표준편차 0 -> 바로 최댓값, 0.42) 조합.
     같은 그룹(자취/30-60) 또래 2명을 지출 없이 만들어야 또래대비소비가 최댓값이 된다.
+
+    tx_date: 지정하지 않으면 오늘 날짜를 쓴다 — check_after_transaction이 이번 달
+    거래만 충동 트렌드 알림을 검사하므로, 이 셋업이 실제로 알림을 발생시키려면
+    거래가 항상 "이번 달"에 속해야 한다.
     """
+    if tx_date is None:
+        tx_date = date.today().isoformat()
     for i in range(2):
         client.post("/auth/signup", json={
             "email": f"peer_impulse_{tx_date}_{i}@test.com", "password": "abcd1234", "nickname": f"peer{i}",
@@ -233,12 +285,12 @@ def test_impulse_monthly_trend_alert_not_repeated_same_tier(client, auth_headers
     first_count = len([json.loads(c["data"]) for c in calls if json.loads(c["data"])["type"] == "impulse_monthly_trend"])
     assert first_count == 1
 
-    # 같은 수준의 거래를 하나 더 등록해도 이미 75는 알렸으니 재발송 안 됨
+    # 같은 수준의 거래를 하나 더 등록해도 이미 75는 알렸으니 재발송 안 됨 (같은 달이어야 하므로 오늘 날짜)
     client.post(
         "/transactions",
         json={
             "amount": 90000, "type": "expense", "category": "쇼핑/패션", "merchant": "쇼핑몰2",
-            "transaction_date": "2026-08-25", "transaction_time": "03:30",
+            "transaction_date": date.today().isoformat(), "transaction_time": "03:30",
         },
         headers=auth_headers,
     )
