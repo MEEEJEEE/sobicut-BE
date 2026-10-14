@@ -1,3 +1,4 @@
+import logging
 from datetime import date as date_type
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -23,9 +24,11 @@ from app.schemas.transaction import (
 from app.services import level as level_service
 from app.services import notification as notification_service
 from app.services.card_parser import CardParseError, CardParser
-from app.services.category_matcher import resolve_category
+from app.services.category_matcher import learn_user_category, resolve_category
 from app.services.impulse import risk_level, transaction_impulse_score
 from app.services.satisfaction import DAY_TYPES
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
@@ -54,6 +57,24 @@ def _validate_body(body: TransactionCreate) -> None:
         raise HTTPException(status_code=422, detail=f"카테고리는 {sorted(CATEGORIES)} 중 하나여야 합니다.")
 
 
+_SUGGESTION_UNKNOWN = object()
+
+
+def _restore_suggested_category(db: Session, user: User, merchant: str | None):
+    """parse 때 사용자에게 보였을 "제안값" 을 LLM 재호출 없이 복원한다.
+
+    parse 때 LLM 결과는 공용 캐시에 저장돼 있으므로 allow_llm=False 로도 같은 값이
+    나온다. 조회 자체가 실패하면 _SUGGESTION_UNKNOWN 을 돌려 학습을 건너뛰게 한다
+    (거래 저장을 막지 않도록 예외는 삼키고, 실패한 트랜잭션 상태는 rollback 으로 정리).
+    """
+    try:
+        return resolve_category(db, merchant, user_id=user.id, allow_llm=False)
+    except Exception:
+        db.rollback()
+        logger.warning("카테고리 제안값 복원 실패 — 학습 건너뜀", exc_info=True)
+        return _SUGGESTION_UNKNOWN
+
+
 @router.post("", response_model=TransactionCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_transaction(
     body: TransactionCreate,
@@ -61,14 +82,23 @@ def create_transaction(
     db: Session = Depends(get_db),
 ):
     _validate_body(body)
+    suggested = _restore_suggested_category(db, user, body.merchant)
+
     tx = Transaction(user_id=user.id, **body.model_dump())
     db.add(tx)
     db.flush()
+    tx_id = tx.id
 
     notification_service.check_after_transaction(db, user, tx)
     level_service.add_exp(db, user, level_service.EXP_TRANSACTION)
     db.commit()
-    return TransactionCreateResponse(id=tx.id)
+
+    # 거래 commit 이후에 학습한다 — 학습 저장 실패가 거래 생성을 되돌리지 않는다.
+    # 제안값과 같으면("맞아요") 저장하지 않는다. 제안값이 None 이면 다르므로 저장 대상.
+    # 수입 거래는 learn_user_category 안에서 걸러진다.
+    if suggested is not _SUGGESTION_UNKNOWN and body.category != suggested:
+        learn_user_category(db, user.id, body.type, body.merchant, body.category)
+    return TransactionCreateResponse(id=tx_id)
 
 
 @router.post("/parse", response_model=CardMessageParseResponse)
@@ -81,8 +111,8 @@ def parse_card_message(
         result = CardParser().parse(body.message_text)
     except CardParseError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    # 룰 > 캐시 > LLM. 어떤 경우에도 예외 없이 카테고리 문자열 또는 None 을 돌려준다.
-    result["category"] = resolve_category(db, result["merchant"])
+    # 사용자 학습 사전 > 룰 > 캐시 > LLM. 어떤 경우에도 예외 없이 카테고리 문자열 또는 None 을 돌려준다.
+    result["category"] = resolve_category(db, result["merchant"], user_id=user.id)
     return result
 
 
@@ -163,9 +193,16 @@ def update_transaction(
 ):
     _validate_body(body)
     tx = _get_owned_transaction(db, user, transaction_id)
+    previous_category = tx.category
     for key, value in body.model_dump().items():
         setattr(tx, key, value)
     db.commit()
+
+    # 거래 commit 이후에 학습한다 — 학습 저장 실패가 수정을 되돌리지 않는다.
+    # 가맹점명·거래 유형도 함께 바뀌었으면 변경 후 값(merchant, type)을 쓴다.
+    # 수입 거래는 learn_user_category 안에서 걸러진다.
+    if body.category != previous_category:
+        learn_user_category(db, user.id, body.type, body.merchant, body.category)
     return MessageResponse(message="수정 완료")
 
 
