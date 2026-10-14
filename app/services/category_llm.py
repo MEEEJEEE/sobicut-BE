@@ -20,6 +20,13 @@ _concat_answer_parts / _finish_reason 는 llm_prescription.py 와 중복이다.
 동작 중인 처방 코드를 건드리지 않으려고 지금은 복사해 둔다.
 추후 공용 Claude 클라이언트 모듈로 통합 검토.
 
+확신도 기준: LLM 은 category 와 함께 confidence(0.0~1.0)를 반환하고, 가맹점명만으로
+판단 근거가 부족하면 category 에 UNCLASSIFIABLE("판단불가")를 넣을 수 있다.
+"판단불가", confidence 누락·비숫자(bool 포함)·0.0~1.0 범위 밖,
+confidence < settings.CLAUDE_CATEGORY_MIN_CONFIDENCE(기본 0.7) 는 모두 미분류(None)로
+처리한다. 범위 검증은 스키마(minimum/maximum)가 아니라 코드에서 한다. 애매한 가맹점을
+"모임/기타" 로 몰아넣지 않고 사용자가 직접 고르도록 하기 위함이다.
+
 프롬프트에는 정규화된 상호명만 전달한다. 금액·시간·사용자 정보는 절대 보내지 않는다.
 어떤 실패(타임아웃·API 오류·레이트리밋(429)·과부하(529)·거절(refusal)·파싱 실패·
 enum 밖 값·API 키 미설정)도 예외를 올리지 않고 None 을 반환한다. 각 경우는 로그로 남긴다.
@@ -43,25 +50,30 @@ TEMPERATURE = 0.0  # 분류기이므로 결정론적으로. 주의: Sonnet 5 / O
                    # temperature 를 기본값 외의 값으로 주면 400 을 반환한다.
                    # CLAUDE_MODEL_CATEGORY 를 그쪽으로 바꾸면 이 필드를 제거할 것.
 
+# LLM 이 가맹점명만으로 판단할 수 없을 때 category 에 넣는 값. CATEGORIES 에는 없다.
+UNCLASSIFIABLE = "판단불가"
+
 # JSON Schema (소문자 타입 표기). Gemini 의 responseSchema 와 달리
 # 모든 object 에 additionalProperties: false 가 필요하다.
 CATEGORY_RESPONSE_SCHEMA: dict = {
     "type": "object",
     "properties": {
-        "category": {"type": "string", "enum": list(CATEGORIES)},
+        "category": {"type": "string", "enum": list(CATEGORIES) + [UNCLASSIFIABLE]},
+        # 범위 제약(minimum/maximum)은 넣지 않는다 — 범위 검증은 classify_category 에서 한다.
+        "confidence": {"type": "number"},
     },
-    "required": ["category"],
+    "required": ["category", "confidence"],
     "additionalProperties": False,
 }
 
 PROMPT = f"""너는 가맹점명을 소비 카테고리로 분류하는 분류기다.
-아래 카테고리 중 정확히 하나를 고른다: {", ".join(CATEGORIES)}
+아래 카테고리 중 하나를 고른다. 판단 근거가 부족하면 고르지 말고 "{UNCLASSIFIABLE}" 를 쓴다: {", ".join(CATEGORIES)}
 - 입력은 가맹점명 한 개다. 다른 정보(금액·시간 등)는 주어지지 않는다.
-- 어느 카테고리인지 애매하면 "모임/기타" 를 고른다.
+- confidence 는 0.0~1.0 사이 숫자로, 고른 category 에 대한 확신도다. 근거가 약하면 낮게 적는다. 임의로 높이지 않는다.
 - JSON 만 출력한다. 설명·인사말·마크다운 코드블록을 붙이지 않는다.
 
 출력 형식:
-{{"category": "..."}}"""
+{{"category": "...", "confidence": 0.0}}"""
 
 
 class _RetryableError(Exception):
@@ -94,9 +106,10 @@ def _finish_reason(envelope: dict) -> str | None:
     return envelope.get("stop_reason")
 
 
-def _request_once(request_body: dict) -> str | None:
-    """Claude 에 1회 요청하고 category 문자열을 반환한다.
+def _request_once(request_body: dict) -> tuple[object, object] | None:
+    """Claude 에 1회 요청하고 (category, confidence) 를 반환한다.
 
+    두 값은 검증 전 원본 그대로다(키가 없으면 None). 값 검증은 classify_category 가 한다.
     일시적 오류는 _RetryableError, 그 외(4xx·거절·빈 응답)는 None 을 반환한다.
     """
     try:
@@ -161,7 +174,7 @@ def _request_once(request_body: dict) -> str | None:
     if not isinstance(parsed, dict):
         logger.warning("카테고리 LLM 응답이 객체 형식이 아닙니다: %r", parsed)
         return None
-    return parsed.get("category")
+    return parsed.get("category"), parsed.get("confidence")
 
 
 def classify_category(normalized_name: str) -> str | None:
@@ -184,10 +197,10 @@ def classify_category(normalized_name: str) -> str | None:
         },
     }
 
-    category: str | None = None
+    result: tuple[object, object] | None = None
     for attempt in range(MAX_ATTEMPTS):
         try:
-            category = _request_once(request_body)
+            result = _request_once(request_body)
             break
         except _RetryableError as e:
             if attempt < MAX_ATTEMPTS - 1:
@@ -196,7 +209,35 @@ def classify_category(normalized_name: str) -> str | None:
             logger.warning("카테고리 LLM 일시적 오류 — 미분류 처리: %s", e)
             return None
 
-    if category is None:
+    if result is None:
+        return None
+    category, confidence = result
+
+    if category == UNCLASSIFIABLE:
+        logger.info("카테고리 LLM 판단불가 — 미분류 처리 (confidence=%r).", confidence)
+        return None
+    # bool 은 int 의 하위 타입이라 명시적으로 제외한다. NaN 은 범위 비교에서 걸러진다.
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        logger.warning(
+            "카테고리 LLM confidence 누락/비숫자 — 미분류 처리: category=%r, confidence=%r",
+            category,
+            confidence,
+        )
+        return None
+    if not 0.0 <= confidence <= 1.0:
+        logger.warning(
+            "카테고리 LLM confidence 범위 밖 — 미분류 처리: category=%r, confidence=%r",
+            category,
+            confidence,
+        )
+        return None
+    if confidence < settings.CLAUDE_CATEGORY_MIN_CONFIDENCE:
+        logger.info(
+            "카테고리 LLM 확신도 미달 (%.2f < %.2f) — 미분류 처리: %r",
+            confidence,
+            settings.CLAUDE_CATEGORY_MIN_CONFIDENCE,
+            category,
+        )
         return None
     if category not in CATEGORIES:
         logger.warning("카테고리 LLM 이 허용되지 않은 값 반환: %r", category)

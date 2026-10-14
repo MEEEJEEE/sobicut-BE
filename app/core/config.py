@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     # 처방용(CLAUDE_MODEL)과 분리해 가볍게/빠르게 교체할 수 있게 둔다.
     CLAUDE_MODEL_CATEGORY: str = "claude-haiku-4-5-20251001"
     CLAUDE_CATEGORY_TIMEOUT: float = 15.0
+    # LLM 이 함께 반환하는 confidence 가 이 값 미만이면 미분류(None) 처리한다.
+    CLAUDE_CATEGORY_MIN_CONFIDENCE: float = 0.7
 
     
 
