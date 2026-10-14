@@ -56,8 +56,9 @@ def test_guess_category_cu_contains_no_longer_misclassifies():
 
 def test_guess_category_strips_pg_prefix():
     # PG사 접두사가 붙어도 " - " 뒤쪽으로 매칭한다.
-    # (사전 신규 항목에 비의존: 기존 "카페"(식비) 규칙으로 검증)
-    assert guess_category("카카오페이_중소3 - 레벨업PC카페 수유역점") == "식비"
+    # ("카페"(식비, contains) 규칙으로 검증. CSV 사전에 "PC카페"(문화/여가)가
+    #  있으므로 그와 겹치지 않도록 상호명에서 "PC" 는 뺐다.)
+    assert guess_category("카카오페이_중소3 - 레벨업카페 수유역점") == "식비"
     # 구분자가 여러 번이면 마지막 것 기준으로 뒤쪽 사용
     assert guess_category("PG_A - PG_B - 스타벅스 강남") == "식비"
 
@@ -175,6 +176,24 @@ def test_guess_category_known_merchants():
     assert guess_category("카카오T") == "교통"
     assert guess_category("CGV 강남") == "문화/여가"
     assert guess_category("다이소") == "생활"
+
+
+def test_guess_category_dictionary_only_merchant():
+    # 기존 하드코딩 룰에는 없고 CSV 사전에만 있는 가맹점.
+    assert guess_category("따릉이 대여") == "교통"
+
+
+def test_guess_category_longer_keyword_wins_over_shorter_overlap():
+    # "PC카페"(문화/여가)와 "카페"(식비)가 겹칠 때 긴 키워드가 이긴다(contains 티어).
+    assert guess_category("레벨업PC카페 수유역점") == "문화/여가"
+    # prefix 티어에서도 동일: "KTX"(교통) > "KT"(고정지출).
+    assert guess_category("KTX 부산역") == "교통"
+
+
+def test_guess_category_conflicts_resolved_to_dictionary():
+    # 기존 룰과 충돌하던 항목은 CSV 사전 값을 따른다.
+    assert guess_category("넷플릭스") == "고정지출"
+    assert guess_category("올리브영 강남점") == "쇼핑/패션"
 
 
 def test_guess_category_unknown_returns_none():
