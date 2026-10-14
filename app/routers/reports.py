@@ -10,7 +10,7 @@ from app.models import LlmPrescription, Transaction, User
 from app.services import bpti as bpti_service
 from app.services import report as report_service
 from app.services import wallet as wallet_service
-from app.services.weekly_factors import build_factors
+from app.services.weekly_factors import build_factors, has_enough_data
 from app.services.weekly_summary import build_weekly_summary, get_iso_week_range
 from app.services.impulse import (
     WEIGHTS,
@@ -281,6 +281,9 @@ def get_prescription(
 
     negative_factors / positive_factors는 코드로 계산하므로(LLM 무관) 처방
     레코드가 없어도 항상 채워서 내려준다. 거래가 없어 팩터가 비면 빈 배열.
+
+    has_enough_data=False(주간 지출 MIN_WEEKLY_TRANSACTIONS건 미만)이면 프론트가
+    요인/처방 카드 전체를 "데이터 부족" 안내로 대체한다.
     """
     if week_start is None:
         week_start = get_iso_week_range(date.today())[0] - timedelta(days=7)
@@ -302,11 +305,25 @@ def get_prescription(
     prev_summary = build_weekly_summary(db, user, week_start - timedelta(days=7))
     factors = build_factors(summary, prev_summary)
 
+    # prescription_status
+    #   ready   : 처방 생성 완료 (prescription = 문자열 배열)
+    #   failed  : 배치가 LLM 호출에 실패함 (content=[]로 기록됨) → 처방 영역만 실패 안내
+    #   pending : 아직 레코드 없음 (배치 미실행 등)
+    if record is None:
+        prescription_status = "pending"
+    elif record.content:
+        prescription_status = "ready"
+    else:
+        prescription_status = "failed"
+
     return {
         "period_start": week_start.isoformat(),
         "period_end": week_end.isoformat(),
-        "prescription": record.content if record else None,
-        "generated_at": record.created_at.isoformat() if record else None,
+        "transaction_count": summary["transaction_count"],
+        "has_enough_data": has_enough_data(summary),
+        "prescription": record.content if prescription_status == "ready" else None,
+        "prescription_status": prescription_status,
+        "generated_at": record.created_at.isoformat() if prescription_status == "ready" else None,
         "negative_factors": factors["negative_factors"],
         "positive_factors": factors["positive_factors"],
     }
