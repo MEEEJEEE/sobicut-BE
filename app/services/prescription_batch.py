@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models import LlmPrescription, User
 from app.services.llm_prescription import LLMPrescriptionError, generate_prescription
-from app.services.weekly_factors import build_factors
+from app.services.weekly_factors import build_factors, has_enough_data
 from app.services.weekly_summary import build_weekly_summary, get_iso_week_range
 
 logger = logging.getLogger(__name__)
@@ -57,14 +57,17 @@ def process_weekly_prescriptions(db: Session, user_id: int | None = None, *, for
             .first()
         )
         if already is not None:
-            if not force:
+            # content == [] 는 이전 실행에서 LLM 생성에 실패했다는 표시다 → 재시도 대상.
+            if already.content and not force:
                 continue
             db.delete(already)
             db.flush()
 
         summary = build_weekly_summary(db, user, last_monday)
-        if summary["transaction_count"] == 0:
-            continue  # 거래 없는 주엔 처방이 의미 없다. LLM 호출 안 함 (쿼터 절약).
+        if not has_enough_data(summary):
+            # 주간 지출이 MIN_WEEKLY_TRANSACTIONS건 미만이면 카드 전체가 "데이터 부족"으로
+            # 대체되므로 처방이 노출되지 않는다. LLM 호출 안 함 (쿼터 절약).
+            continue
 
         prev_summary = build_weekly_summary(db, user, prev_monday)
         factors = build_factors(summary, prev_summary)
@@ -77,6 +80,17 @@ def process_weekly_prescriptions(db: Session, user_id: int | None = None, *, for
             prescriptions = generate_prescription(factors)
         except LLMPrescriptionError as e:
             logger.warning("주간 처방 생성 실패 user_id=%s: %s", user.id, e)
+            # 실패도 기록해 둔다(content=[]). 조회 API가 "아직 생성 전"과 "생성 실패"를
+            # 구분해 처방 영역에만 실패 안내를 띄우기 위함. 다음 배치 실행 시 재시도된다.
+            db.add(
+                LlmPrescription(
+                    user_id=user.id,
+                    period_type=PERIOD_TYPE,
+                    period_start=last_monday,
+                    content=[],
+                    model_name=settings.CLAUDE_MODEL,
+                )
+            )
             continue
 
         db.add(

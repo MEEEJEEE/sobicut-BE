@@ -24,6 +24,15 @@ POSITIVE_TAG_PHRASES = {
 
 _KNOWN_TAGS = set(EMOTION_NAMES)
 
+# 주간 요인/처방 카드를 보여주기 위한 최소 지출 건수.
+# 이보다 적으면 카드 전체를 "데이터 부족" 안내로 대체하고, 배치도 LLM을 호출하지 않는다.
+MIN_WEEKLY_TRANSACTIONS = 5
+
+
+def has_enough_data(summary: dict) -> bool:
+    """주간 지출 건수가 MIN_WEEKLY_TRANSACTIONS 이상인지."""
+    return summary.get("transaction_count", 0) >= MIN_WEEKLY_TRANSACTIONS
+
 
 def _has_final_consonant(word: str) -> bool:
     """한글 단어의 마지막 글자에 받침이 있는지: (ord(ch) - 0xAC00) % 28 != 0."""
